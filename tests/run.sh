@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 DB="${TEST_DB:-family_tree_test}"
 
 build() {
-  psql -qX -v ON_ERROR_STOP=1 -d postgres -c "drop database if exists $DB" -c "create database $DB" 2>/dev/null
+  PGOPTIONS="-c client_min_messages=warning" psql -qX -v ON_ERROR_STOP=1 -d postgres -c "drop database if exists $DB" -c "create database $DB"
   psql -qX -v ON_ERROR_STOP=1 -d "$DB" -o /dev/null -f tests/supabase_shim.sql
   for f in supabase/migrations/*.sql; do psql -qX -v ON_ERROR_STOP=1 -d "$DB" -o /dev/null -f "$f"; done
 }
