@@ -300,7 +300,9 @@ If contributor numbers stay low, that answers the product question too.
 
 ## 9. Seed data [OPEN]
 
-- `family tree.xlsx` (26 Jun 11): in Siddique's Gmail sent folder. Write an import script once its structure is known.
+- `family tree.xlsx` (26 Jun 11): retrieved from Gmail into `/seed`. It is a free-form visual layout (names placed under parents, dates in the row below), not a table, so it cannot be parsed generically.
+- It has been transcribed by hand (`seed/transcribe.py`) into `seed/persons.csv` and `seed/relationships.csv`, shaped like §3: 72 persons, 5 generations, 13 marriages. Uncertain readings are in each row's `notes`.
+- Phase 0 import script reads those two CSVs (not the xlsx) and loads them via the service role from Siddique's machine.
 - **[DECIDED]** Seed files hold real personal data, including minors. `/seed` is gitignored; never commit data. Run imports locally only.
 - Family Echo account: attempt a GEDCOM export if the login still works.
 
