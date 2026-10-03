@@ -46,7 +46,8 @@ persons         id, family_id, full_name, known_as, gender,
                 native_place, city, state, country,
                 profile_photo_url, claimed_by (user_id, nullable),
                 created_by, updated_at
-person_contacts person_id, family_id, phone, email, phone_hidden (bool)
+person_contacts person_id, family_id, phone, email, phone_hidden (bool),
+                has_whatsapp (bool, default true; set by the person or an admin)
                 -- separate table: RLS is row-level, so contact fields cannot live on persons
 relationships   id, family_id, person_a, person_b,
                 type: parent_of | spouse_of,
@@ -66,7 +67,7 @@ announcements   id, family_id, type: marriage | birth | event | demise | general
                 title, body, event_date (nullable), location (nullable), related_person_ids[],
                 audience: all | selected, created_by, approved_by (nullable),
                 status: draft | pending_approval | sent | cancelled, sent_at
-announcement_recipients announcement_id, family_id, user_id, emailed_at, read_at
+announcement_recipients announcement_id, family_id, user_id, emailed_at, sms_sent_at, read_at
 notification_prefs user_id, family_id, type, email_enabled (bool)
 audit_log       id, family_id, actor_user_id, action, target, created_at
                 -- invites, recoveries, role changes, contact reads are logged
@@ -155,11 +156,16 @@ Announce marriages, births, events and demises to selected members or to everyon
 - Admins and branch owners: send directly.
 - Members: can draft; the draft goes to an admin for approval (`pending_approval`) before it is sent.
 
-**Delivery**
-- In-app feed, always, for every recipient. This is the record.
-- Email via the free-tier SMTP (§2), sent by an Edge Function. The sender never sees recipients' emails or phones; the §4 contact rules still apply.
-- Email-exempt members: in-app only, plus a **"Share to WhatsApp"** button for the sender (opens WhatsApp with the text pre-filled; free, no API).
-- **No paid SMS or WhatsApp Business API** for announcements. Flag before adding one.
+**Delivery** [DECIDED]
+1. **In-app feed:** always, for every recipient. This is the record.
+2. **Email:** via the free-tier SMTP (§2), sent by an Edge Function, to every recipient with a verified email.
+3. **WhatsApp (primary outside the app):** a **"Share to WhatsApp"** button for the sender. It opens WhatsApp with the text and app link pre-filled, so the sender can send it to a family group or contacts. Free; no WhatsApp Business API for now.
+4. **SMS (fallback):** sent automatically by an Edge Function **only** to recipients with `has_whatsapp = false`. Paid, so:
+   - The SMS is short: one registered DLT template with the type, a short title and the app link (e.g. "Family update: {type} – {title}. View: {link}"). Free text is not allowed under India DLT.
+   - Admin-set monthly SMS cap; sending stops and admins are alerted when it is reached.
+   - The sender sees how many recipients will get SMS before sending.
+
+The sender never sees recipients' emails or phones; the §4 contact rules still apply.
 
 **Rules**
 - Recipients can turn off email per type in `notification_prefs`. **Demise notices always email** (cannot be muted).
