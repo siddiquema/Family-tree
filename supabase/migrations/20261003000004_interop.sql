@@ -99,3 +99,6 @@ select cp.family_id, cp.parents[1], cp.parents[2], null, null, null, array_agg(c
                       and s.person_a = cp.parents[1] and s.person_b = cp.parents[2])
  group by cp.family_id, cp.parents;
 grant select on public.family_units to authenticated;
+
+-- Supabase grants new tables to anon by default; row-level security would still block it, but be explicit.
+revoke all on public.sources, public.person_sources, public.external_ids, public.family_units from anon;
