@@ -23,7 +23,7 @@ Earlier attempts on GenoPro, Family Echo (2011), Ancestry and imlee (2012–13) 
 | Layer | Choice | Note |
 |---|---|---|
 | Frontend | PWA, mobile-first, **plain JavaScript** (ES modules, no framework) | **[DECIDED]** Vite as dev server/bundler only (free). Hash-based routing for GitHub Pages. JSDoc types where helpful |
-| Backend | Supabase (Postgres, Auth, Storage, RLS) | Free tier for v1 |
+| Backend | Supabase (Postgres, Auth, Storage, RLS) | Free tier for v1. Project `hhmogqbmakdrqewlljrs` (https://hhmogqbmakdrqewlljrs.supabase.co), Mumbai region. Only the URL and publishable key go in code |
 | Auth | Invite-only, password login; phone + email both verified by OTP | **[DECIDED]** See §5a. SMS = paid (Twilio etc. + India DLT) — flagged |
 | Email delivery | Free-tier SMTP (Brevo / Resend) | Supabase built-in SMTP is rate-limited; not for production |
 | Server logic | Supabase Edge Functions | Invite redemption and recovery need the service role; never ship it to the client |
