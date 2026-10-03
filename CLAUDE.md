@@ -38,7 +38,8 @@ Earlier attempts on GenoPro, Family Echo (2011), Ancestry and imlee (2012–13) 
 
 ```
 families        id, name, created_at
-members         user_id (auth), family_id, person_id (claimed profile), role: admin | branch_owner | member
+members         user_id (auth), family_id, person_id (claimed profile), role: admin | branch_owner | member,
+                email_exempt (bool), email_exempt_by, email_exempt_reason, email_exempt_at
 persons         id, family_id, full_name, known_as, gender,
                 birth_year (nullable), birth_year_approx (bool), birth_date (optional),
                 is_living, death_year,
@@ -61,6 +62,12 @@ invites         token_hash, family_id, person_id (nullable), created_by, expires
 recovery_requests id, family_id, target_user_id, authorised_by, approved_by (admin),
                 status: authorised | approved | completed | expired | cancelled,
                 expires_at, completed_at
+announcements   id, family_id, type: marriage | birth | event | demise | general,
+                title, body, event_date (nullable), location (nullable), related_person_ids[],
+                audience: all | selected, created_by, approved_by (nullable),
+                status: draft | pending_approval | sent | cancelled, sent_at
+announcement_recipients announcement_id, family_id, user_id, emailed_at, read_at
+notification_prefs user_id, family_id, type, email_enabled (bool)
 audit_log       id, family_id, actor_user_id, action, target, created_at
                 -- invites, recoveries, role changes, contact reads are logged
 ```
@@ -103,7 +110,7 @@ Implement once as a SQL function `is_immediate_family(viewer_person, target_pers
 
 ### Onboarding
 1. Invite token: single use, 7-day expiry, stored hashed.
-2. Edge Function validates the token, then requires **both phone (SMS OTP) and email (email OTP)** to be verified.
+2. Edge Function validates the token, then requires **both phone (SMS OTP) and email (email OTP)** to be verified. Exception: members an admin has marked email-exempt (below) verify phone only.
 3. User sets a password (min 12 chars). Account is created server-side and linked to `members` / `persons`.
 
 ### Login
@@ -123,7 +130,42 @@ Guards:
 - Changing a verified phone or email needs OTP on the old **and** new contact.
 - Every step is written to `audit_log`; admins see a recovery history.
 
+### Email exemption (admin override) [DECIDED]
+For relatives without email (often elders). One email channel is lost, so an extra human check replaces it.
+- Only an admin can set it, per member, with a mandatory reason. It can be set on the invite (before onboarding) or later.
+- Onboarding: phone OTP only.
+- Recovery: relative authorises → **a second, different immediate-family relative confirms** → admin approves → SMS OTP → new password.
+- Login MFA is unchanged. Admins cannot be email-exempt.
+- Revocable at any time. Cleared automatically once the member adds and verifies an email.
+- Set, revoke and use are all written to `audit_log`. Admins see a list of all exempt members.
+
 Cost note: SMS is paid (onboarding + recovery only, so volume is low). Get Siddique's OK on the provider before enabling it.
+
+---
+
+## 5b. Family announcements [DECIDED]
+
+Announce marriages, births, events and demises to selected members or to everyone.
+
+**Audience**
+- **All members** of the family, or
+- **Selected members**, picked individually or in bulk by branch ("all descendants of X") or by immediate family of a person. A preview shows the recipient count before sending.
+
+**Who can send**
+- Admins and branch owners: send directly.
+- Members: can draft; the draft goes to an admin for approval (`pending_approval`) before it is sent.
+
+**Delivery**
+- In-app feed, always, for every recipient. This is the record.
+- Email via the free-tier SMTP (§2), sent by an Edge Function. The sender never sees recipients' emails or phones; the §4 contact rules still apply.
+- Email-exempt members: in-app only, plus a **"Share to WhatsApp"** button for the sender (opens WhatsApp with the text pre-filled; free, no API).
+- **No paid SMS or WhatsApp Business API** for announcements. Flag before adding one.
+
+**Rules**
+- Recipients can turn off email per type in `notification_prefs`. **Demise notices always email** (cannot be muted).
+- A demise announcement prompts the sender to mark the person deceased (`is_living = false`, `death_year`). It goes through `edit_requests` if they are not the branch owner.
+- Announcements mentioning a minor follow §4: only logged-in members see them, never public.
+- Rate limit: max 10 announcements per sender per day.
 
 ---
 
@@ -136,11 +178,12 @@ Cost note: SMS is paid (onboarding + recovery only, so volume is low). Get Siddi
 - Interactive tree view (pan/zoom, mobile-friendly)
 - **Relationship calculator:** show how any two people are related, with paternal/maternal and elder/younger distinct. English labels first, plus the family's language **[OPEN — which language(s)]**
 - Edit-approval queue
+- Family announcements to selected members or all (§5b)
 - Privacy rules (§4)
 - Basic usage logging needed for the §8 metrics
 
 ### Phase 2 (do NOT build yet)
-Birthday/anniversary reminders · directory search (by city, profession etc.) · memorial pages · GEDCOM import/export · printable tree poster · family events/news.
+Birthday/anniversary reminders · directory search (by city, profession etc.) · memorial pages · GEDCOM import/export · printable tree poster · event RSVPs and calendar invites (announcements themselves moved to v1, §5b).
 
 ---
 
@@ -150,7 +193,7 @@ Birthday/anniversary reminders · directory search (by city, profession etc.) ·
 |---|---|---|
 | 0 — Scaffold | Repo, Supabase project, schema + RLS, seed import script | RLS tests pass; seed data loads |
 | 1 — Core | Auth, profiles, relationship linking, tree view | Siddique can build his own branch end-to-end |
-| 2 — Contribution | Invites, claiming, edit approval, nudges | 3–5 pilot relatives add data unaided |
+| 2 — Contribution | Invites, claiming, edit approval, nudges, announcements | 3–5 pilot relatives add data unaided |
 | 3 — Launch | Kinship calculator, privacy hardening, metrics logging | Shared with the wider family |
 
 Tag a git release at each phase exit.
