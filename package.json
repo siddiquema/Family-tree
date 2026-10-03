@@ -1,0 +1,14 @@
+{
+  "name": "family-tree",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:db": "tests/run.sh",
+    "seed:import": "node scripts/import-seed.mjs",
+    "seed:check": "psql -X -f scripts/integrity-report.sql"
+  },
+  "devDependencies": {
+    "csv-parse": "5.6.0",
+    "pg": "8.13.1"
+  }
+}

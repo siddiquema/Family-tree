@@ -36,6 +36,10 @@ Earlier attempts on GenoPro, Family Echo (2011), Ancestry and imlee (2012–13) 
 
 ## 3. Data model (starting point — refine in Phase 0)
 
+> **Implemented** in `supabase/migrations/` and described in `docs/database.md`, which wins where the two differ
+> (e.g. `members.person_id` replaces `persons.claimed_by`; contacts moved to `person_contacts`; added `sources`, `external_ids`).
+> Tests: `tests/run.sh` (83 checks). Data-quality report: `scripts/integrity-report.sql`.
+
 ```
 families        id, name, created_at
 members         user_id (auth), family_id, person_id (claimed profile), role: admin | branch_owner | member,
@@ -305,7 +309,7 @@ If contributor numbers stay low, that answers the product question too.
 
 - `family tree.xlsx` (26 Jun 11): retrieved from Gmail into `/seed`. It is a free-form visual layout (names placed under parents, dates in the row below), not a table, so it cannot be parsed generically.
 - It has been transcribed by hand (`seed/transcribe.py`) into `seed/persons.csv` and `seed/relationships.csv`, shaped like §3: 72 persons, 5 generations, 13 marriages. Uncertain readings are in each row's `notes`.
-- Phase 0 import script reads those two CSVs (not the xlsx) and loads them via the service role from Siddique's machine.
+- `scripts/import-seed.mjs` reads those two CSVs (not the xlsx) and loads them over a direct database connection from Siddique's machine. It is safe to re-run: rows are matched through `external_ids`.
 - **[DECIDED]** Seed files hold real personal data, including minors. `/seed` is gitignored; never commit data. Run imports locally only.
 - Family Echo account: attempt a GEDCOM export if the login still works.
 
