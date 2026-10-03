@@ -1,0 +1,12 @@
+# Real family data — never commit (see CLAUDE.md §9)
+/seed/
+*.xlsx
+*.ged
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+node_modules/
+dist/
