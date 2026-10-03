@@ -22,7 +22,7 @@ Earlier attempts on GenoPro, Family Echo (2011), Ancestry and imlee (2012–13) 
 
 | Layer | Choice | Note |
 |---|---|---|
-| Frontend | PWA, mobile-first | React + Vite + TypeScript recommended **[OPEN — confirm vs vanilla]** |
+| Frontend | PWA, mobile-first, **plain JavaScript** (ES modules, no framework) | **[DECIDED]** Vite as dev server/bundler only (free). Hash-based routing for GitHub Pages. JSDoc types where helpful |
 | Backend | Supabase (Postgres, Auth, Storage, RLS) | Free tier for v1 |
 | Auth | Invite-only, password login; phone + email both verified by OTP | **[DECIDED]** See §5a. SMS = paid (Twilio etc. + India DLT) — flagged |
 | Email delivery | Free-tier SMTP (Brevo / Resend) | Supabase built-in SMTP is rate-limited; not for production |
@@ -41,7 +41,8 @@ families        id, name, created_at
 members         user_id (auth), family_id, person_id (claimed profile), role: admin | branch_owner | member,
                 email_exempt (bool), email_exempt_by, email_exempt_reason, email_exempt_at,
                 ui_language: en | ta (default en)
-persons         id, family_id, full_name, full_name_ta (optional), known_as, gender,
+persons         id, family_id, full_name (nullable), name_known (bool, default true), full_name_ta (optional),
+                known_as, house_name, house_name_ta (optional), gender,
                 birth_year (nullable), birth_year_approx (bool), birth_date (optional),
                 is_living, death_year,
                 native_place, city, state, country,
@@ -80,6 +81,8 @@ Rules:
 - Support remarriage, adoption and half-siblings in the schema from the start.
 - `birth_year` is nullable because many ancestors have no known year. Minor check: unknown year counts as a minor unless the person is deceased or an admin confirms they are an adult.
 - Store tokens (invite, recovery) only as hashes.
+- **Unknown names are kept as placeholders [DECIDED]:** when a child is known to exist but the name is not, store the person with `name_known = false` and show "Name not available". Never drop them; relatives can fill the name in later.
+- **House name [DECIDED]:** older generations were known by a house/family nickname (e.g. Pathakannu, Appakannu). Store it in `house_name`, separate from `known_as` (a personal nickname). Show it beside the name in the tree and profile, and make it searchable.
 
 ### Immediate family [DECIDED]
 Used for both phone visibility (§4) and recovery authorisation (§5a):
