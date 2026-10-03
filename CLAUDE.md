@@ -39,8 +39,9 @@ Earlier attempts on GenoPro, Family Echo (2011), Ancestry and imlee (2012–13) 
 ```
 families        id, name, created_at
 members         user_id (auth), family_id, person_id (claimed profile), role: admin | branch_owner | member,
-                email_exempt (bool), email_exempt_by, email_exempt_reason, email_exempt_at
-persons         id, family_id, full_name, known_as, gender,
+                email_exempt (bool), email_exempt_by, email_exempt_reason, email_exempt_at,
+                ui_language: en | ta (default en)
+persons         id, family_id, full_name, full_name_ta (optional), known_as, gender,
                 birth_year (nullable), birth_year_approx (bool), birth_date (optional),
                 is_living, death_year,
                 native_place, city, state, country,
@@ -182,7 +183,9 @@ The sender never sees recipients' emails or phones; the §4 contact rules still 
 - Person profile: name, known-as, photos, birth year/DOB, living status, native place, city/state/country, optional phone with visibility, education (multiple), work (typed)
 - Relationship linking (parents, children, spouse)
 - Interactive tree view (pan/zoom, mobile-friendly)
-- **Relationship calculator:** show how any two people are related, with paternal/maternal and elder/younger distinct. English labels first, plus the family's language **[OPEN — which language(s)]**
+- **Relationship calculator:** show how any two people are related, with paternal/maternal and elder/younger distinct. Labels come from the admin-managed kinship taxonomy (§6a), in English and Tamil.
+- **Languages [DECIDED]:** English and Tamil. Per-user toggle (`members.ui_language`). All UI strings in i18n files (`en.json`, `ta.json`); no hard-coded text. Tamil font: Noto Sans Tamil (Google Fonts, free).
+- Admin screen for the kinship taxonomy (§6a)
 - Edit-approval queue
 - Family announcements to selected members or all (§5b)
 - Privacy rules (§4)
@@ -193,6 +196,80 @@ Birthday/anniversary reminders · directory search (by city, profession etc.) ·
 
 ---
 
+## 6a. Kinship taxonomy [DECIDED — terms OPEN for verification]
+
+Relationship names follow **Kanyakumari district Muslim family usage**, which differs from standard Tamil (e.g. Vaappa/Umma, Kaakka). Terms are data, not code: admins manage them.
+
+### Path notation
+A relationship is a canonical path from the viewer ("me") to the other person.
+- Steps: `F` father, `M` mother, `S` son, `D` daughter, `B` brother, `Z` sister, `H` husband, `W` wife.
+- Age prefix: `e` elder, `y` younger. For siblings, relative to the person before them in the path (`F.eB` = father's elder brother). Computed from birth year/date; unknown → no prefix.
+- Examples: `F.eB` periya vaappa · `M.B.S` maternal uncle's son · `H.M` mother-in-law.
+
+### Table
+```
+kinship_terms   id, family_id, path, side: paternal | maternal | none,
+                target_gender, speaker_gender (nullable — only if the term changes by speaker),
+                label_en, label_ta_formal (Tamil script), label_ta_local (Tamil script),
+                label_ta_local_roman, is_verified (bool), notes,
+                updated_by, updated_at
+```
+Unique on `(family_id, path, speaker_gender)`. Each new family gets a copy of the seed set below.
+
+### Calculator rules
+1. Find the shortest path over `parent_of` / `spouse_of`; rewrite to canonical steps (`F.S` that isn't me → `B` with e/y).
+2. **Parallel cousins** (father's brother's or mother's sister's children) take sibling terms (Kaakka, Thambi…), as in Tamil usage. **Cross cousins** (father's sister's or mother's brother's children) take Machaan / Machini terms.
+3. Look up the path in `kinship_terms`. Show `label_ta_local` **only if `is_verified`**; otherwise `label_ta_formal`. English always.
+4. No term found → build a descriptive label in both languages ("father's elder brother's son" / "அப்பாவின் அண்ணனின் மகன்") and add the path to an admin "missing terms" list.
+
+### Admin management
+- Add, edit and delete terms; mark verified; see the missing-terms list with how often each path was looked up.
+- Every change goes to `audit_log`. Members can suggest a term; suggestions go to admins via `edit_requests`.
+
+### Seed set (draft)
+Formal Tamil is standard. **Local terms are a draft and must be verified by Siddique / family elders** before `is_verified` is set; they ship as unverified.
+
+| Path | English | Formal Tamil | Local (draft) |
+|---|---|---|---|
+| F | Father | அப்பா | வாப்பா (Vaappa) |
+| M | Mother | அம்மா | உம்மா (Umma) |
+| F.F | Paternal grandfather | தாத்தா | ? |
+| F.M | Paternal grandmother | பாட்டி | ? |
+| M.F | Maternal grandfather | தாத்தா | ? |
+| M.M | Maternal grandmother | பாட்டி | ? |
+| eB | Elder brother | அண்ணன் | காக்கா (Kaakka) |
+| yB | Younger brother | தம்பி | தம்பி (Thambi) |
+| eZ | Elder sister | அக்கா | ராத்தா (Raatha)? |
+| yZ | Younger sister | தங்கை | தங்கச்சி (Thangachi) |
+| F.eB | Father's elder brother | பெரியப்பா | பெரிய வாப்பா (Periya Vaappa) |
+| F.yB | Father's younger brother | சித்தப்பா | இளைய வாப்பா (Ilaya Vaappa)? |
+| F.eB.W | Father's elder brother's wife | பெரியம்மா | பெரியும்மா (Periyumma)? |
+| F.yB.W | Father's younger brother's wife | சித்தி | இளையும்மா (Ilayumma)? |
+| F.Z | Father's sister | அத்தை | ? |
+| F.Z.H | Father's sister's husband | மாமா | மாமா (Maama) |
+| M.eZ | Mother's elder sister | பெரியம்மா | பெரியும்மா (Periyumma)? |
+| M.yZ | Mother's younger sister | சித்தி | இளையும்மா (Ilayumma)? |
+| M.B | Mother's brother | மாமா | மாமா (Maama) |
+| M.B.W | Mother's brother's wife | மாமி | மாமி (Maami) |
+| M.B.S / F.Z.S | Cross cousin (male) | மச்சான் / அத்தான் | மச்சான் (Machaan) |
+| M.B.D / F.Z.D | Cross cousin (female) | மச்சினி | ? |
+| S | Son | மகன் | ? |
+| D | Daughter | மகள் | ? |
+| S.S / D.S | Grandson | பேரன் | பேரன் (Peran) |
+| S.D / D.D | Granddaughter | பேத்தி | பேத்தி (Pethi) |
+| H | Husband | கணவர் | ? |
+| W | Wife | மனைவி | ? |
+| H.F / W.F | Father-in-law | மாமனார் | மாமா (Maama)? |
+| H.M / W.M | Mother-in-law | மாமியார் | மாமி (Maami)? |
+| eB.W | Elder brother's wife | அண்ணி | ? |
+| Z.H | Sister's husband | மச்சான் / அத்தான் | மச்சான் (Machaan)? |
+| W.B | Wife's brother | மச்சான் | மச்சான் (Machaan) |
+| H.Z | Husband's sister | நாத்தனார் | ? |
+
+`?` = no local term known yet; falls back to formal Tamil until an admin adds one.
+
+---
+
 ## 7. Build phases
 
 | Phase | Deliverable | Exit check |
@@ -200,7 +277,7 @@ Birthday/anniversary reminders · directory search (by city, profession etc.) ·
 | 0 — Scaffold | Repo, Supabase project, schema + RLS, seed import script | RLS tests pass; seed data loads |
 | 1 — Core | Auth, profiles, relationship linking, tree view | Siddique can build his own branch end-to-end |
 | 2 — Contribution | Invites, claiming, edit approval, nudges, announcements | 3–5 pilot relatives add data unaided |
-| 3 — Launch | Kinship calculator, privacy hardening, metrics logging | Shared with the wider family |
+| 3 — Launch | Kinship calculator + taxonomy admin (en/ta), privacy hardening, metrics logging | Shared with the wider family |
 
 Tag a git release at each phase exit.
 
