@@ -27,7 +27,7 @@ Earlier attempts on GenoPro, Family Echo (2011), Ancestry and imlee (2012–13) 
 | Auth | Invite-only, password login; phone + email both verified by OTP | **[DECIDED]** See §5a. SMS = paid (Twilio etc. + India DLT) — flagged |
 | Email delivery | Free-tier SMTP (Brevo / Resend) | Supabase built-in SMTP is rate-limited; not for production |
 | Server logic | Supabase Edge Functions | Invite redemption and recovery need the service role; never ship it to the client |
-| Hosting | GitHub Pages (static PWA) | GitHub user: `siddiquema`. Repo is public on the free plan — code only, never data (§9) |
+| Hosting | GitHub Pages (static PWA) | GitHub user: `siddiquema`. Repo is public on the free plan — code only, never data (§9). `.github/workflows/deploy-demo.yml` auto-deploys the **demo** build (made-up family) to Pages on every push to this branch; needs Settings → Pages → Source → "GitHub Actions" set once |
 | Tree rendering | Evaluate existing libs (e.g. `family-chart`, d3-based) before building custom | |
 
 **Multi-tenant-ready from day one [DECIDED]:** every table carries `family_id`, and every RLS policy scopes by it. Do NOT build billing, family onboarding or super-admin UI yet.

@@ -1,0 +1,48 @@
+name: Deploy demo prototype to GitHub Pages
+
+# Builds and publishes ONLY the public demo: src/data/demo-family.js, an invented family
+# (CLAUDE.md §9). The real family's data lives outside this repo and is never built here —
+# that version only ever runs from a file on Siddique's own machine.
+#
+# One-time manual step (cannot be done from this workflow): in the repo's
+# Settings → Pages, set "Build and deployment → Source" to "GitHub Actions".
+on:
+  push:
+    branches: [claude/family-tree-markdown-review-0uig1x]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v4
+        id: deployment
