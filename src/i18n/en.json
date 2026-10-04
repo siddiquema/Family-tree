@@ -149,5 +149,16 @@
  "menu.removeConfirmTitle": "Remove {name}?",
  "menu.removeConfirmBody": "This removes {n} family link{s}: others linked only through them (e.g. a child or spouse) stay in the tree.",
  "menu.removeConfirmAction": "Yes, remove",
- "menu.removed": "{name} was removed"
+ "menu.removed": "{name} was removed",
+ "admin.dataTitle": "Family data",
+ "admin.dataExportNote": "Download every person and family link as two CSV files you can open and edit in Excel. These are the same files used to load data into Supabase, so edits made here can be pushed there later.",
+ "admin.dataDownloadPersons": "Download persons.csv",
+ "admin.dataDownloadRelationships": "Download relationships.csv",
+ "admin.dataImportNote": "Edited the files in Excel? Upload both here to update this prototype. This replaces every person and link currently shown, so save a copy of what you download first. Signed-in members must stay in the file.",
+ "admin.dataPersonsFile": "persons.csv",
+ "admin.dataRelationshipsFile": "relationships.csv",
+ "admin.dataImportAction": "Update this prototype",
+ "admin.dataImported": "Loaded {people} people and {relationships} links",
+ "admin.dataMoreErrors": "…and {n} more",
+ "admin.dataSupabaseNote": "This only updates the prototype in your browser. To update the real database, use the uploaded files with scripts/import-seed.mjs, or paste them through scripts/seed-to-sql.mjs as before."
 }

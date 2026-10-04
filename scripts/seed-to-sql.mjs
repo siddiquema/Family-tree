@@ -38,7 +38,7 @@ const personRows = persons.map((p) => {
   const known = p.name_known !== 'false';
   return `  (${lit(p.id)}, ${known ? lit(p.full_name) : 'null'}, ${known}, ${lit(p.known_as)}, ${lit(p.house_name)}, `
     + `'${GENDER[p.gender] ?? 'unknown'}', ${num(p.birth_year)}, ${lit(p.birth_date)}::date, ${bool(p.is_living)}, `
-    + `${num(p.death_year)}, ${lit(p.notes)})`;
+    + `${num(p.death_year)}, ${lit(p.native_place)}, ${lit(p.city)}, ${lit(p.notes)})`;
 });
 const relRows = relationships.map((r) => `  (${lit(r.person_a)}, ${lit(r.person_b)}, ${lit(r.type)}, `
   + `${r.type === 'parent_of' ? lit(r.subtype || 'biological') : 'null'}, ${r.type === 'spouse_of' ? lit(r.status || 'married') : 'null'})`);
@@ -49,9 +49,9 @@ begin;
 
 create temp table seed_persons (
   ext text primary key, full_name text, name_known boolean, known_as text, house_name text, gender text,
-  birth_year int, birth_date date, is_living boolean, death_year int, notes text, pid uuid
+  birth_year int, birth_date date, is_living boolean, death_year int, native_place text, city text, notes text, pid uuid
 ) on commit drop;
-insert into seed_persons (ext, full_name, name_known, known_as, house_name, gender, birth_year, birth_date, is_living, death_year, notes) values
+insert into seed_persons (ext, full_name, name_known, known_as, house_name, gender, birth_year, birth_date, is_living, death_year, native_place, city, notes) values
 ${personRows.join(',\n')};
 
 create temp table seed_rels (a text, b text, type text, subtype text, status text) on commit drop;
@@ -71,11 +71,11 @@ update seed_persons s set pid = coalesce(
 
 update persons p set full_name = s.full_name, name_known = s.name_known, known_as = s.known_as,
        house_name = s.house_name, gender = s.gender, birth_year = s.birth_year, birth_date = s.birth_date,
-       is_living = s.is_living, death_year = s.death_year, notes = s.notes
+       is_living = s.is_living, death_year = s.death_year, native_place = s.native_place, city = s.city, notes = s.notes
   from seed_persons s where p.id = s.pid;
 insert into persons (id, family_id, full_name, name_known, known_as, house_name, gender,
-                     birth_year, birth_date, is_living, death_year, notes)
-select pid, ${fam}, full_name, name_known, known_as, house_name, gender, birth_year, birth_date, is_living, death_year, notes
+                     birth_year, birth_date, is_living, death_year, native_place, city, notes)
+select pid, ${fam}, full_name, name_known, known_as, house_name, gender, birth_year, birth_date, is_living, death_year, native_place, city, notes
   from seed_persons s where not exists (select 1 from persons p where p.id = s.pid);
 insert into external_ids (family_id, person_id, system, external_id)
 select ${fam}, pid, '${SYSTEM}', ext from seed_persons on conflict do nothing;

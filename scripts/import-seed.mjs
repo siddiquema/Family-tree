@@ -53,7 +53,8 @@ try {
     const values = [
       nameKnown ? blank(p.full_name) : null, nameKnown, blank(p.known_as), blank(p.house_name),
       GENDER[p.gender] ?? 'unknown', int(p.birth_year), blank(p.birth_date),
-      p.is_living === '' ? null : p.is_living === 'true', int(p.death_year), blank(p.notes),
+      p.is_living === '' ? null : p.is_living === 'true', int(p.death_year),
+      blank(p.native_place), blank(p.city), blank(p.notes),
     ];
     const existing = await client.query(
       'select person_id from external_ids where family_id = $1 and system = $2 and external_id = $3',
@@ -63,14 +64,15 @@ try {
       personId = existing.rows[0].person_id;
       await client.query(
         `update persons set full_name = $2, name_known = $3, known_as = $4, house_name = $5, gender = $6,
-                birth_year = $7, birth_date = $8, is_living = $9, death_year = $10, notes = $11
+                birth_year = $7, birth_date = $8, is_living = $9, death_year = $10,
+                native_place = $11, city = $12, notes = $13
           where id = $1`, [personId, ...values]);
       updated++;
     } else {
       ({ rows: [{ id: personId }] } = await client.query(
         `insert into persons (family_id, full_name, name_known, known_as, house_name, gender,
-                              birth_year, birth_date, is_living, death_year, notes)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) returning id`, [familyId, ...values]));
+                              birth_year, birth_date, is_living, death_year, native_place, city, notes)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) returning id`, [familyId, ...values]));
       await client.query(
         'insert into external_ids (family_id, person_id, system, external_id) values ($1, $2, $3, $4)',
         [familyId, personId, SYSTEM, p.id]);

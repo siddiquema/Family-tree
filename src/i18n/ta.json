@@ -149,5 +149,16 @@
  "menu.removeConfirmTitle": "{name} அவர்களை அகற்றவா?",
  "menu.removeConfirmBody": "இதனுடன் தொடர்புடைய {n} உறவுப் பாதை(கள்) நீக்கப்படும்; இவர் வழியாக மட்டும் இணைந்த மற்றவர்கள் (பிள்ளை, வாழ்க்கைத் துணை) மரத்தில் தொடர்வார்கள்.",
  "menu.removeConfirmAction": "ஆம், அகற்று",
- "menu.removed": "{name} அகற்றப்பட்டார்"
+ "menu.removed": "{name} அகற்றப்பட்டார்",
+ "admin.dataTitle": "குடும்பத் தரவு",
+ "admin.dataExportNote": "ஒவ்வொரு நபரையும் உறவுப் பாதைகளையும் Excel-இல் திறந்து திருத்தக்கூடிய இரு CSV கோப்புகளாகப் பதிவிறக்கவும். இவையே Supabase-க்குத் தரவேற்ற பயன்படுத்தப்படும் கோப்புகள்; இங்கு செய்யும் திருத்தங்களை பின்னர் அங்கு அனுப்பலாம்.",
+ "admin.dataDownloadPersons": "persons.csv பதிவிறக்கு",
+ "admin.dataDownloadRelationships": "relationships.csv பதிவிறக்கு",
+ "admin.dataImportNote": "Excel-இல் திருத்திவிட்டீர்களா? இரண்டையும் இங்கே பதிவேற்றி இந்த முன்மாதிரியைப் புதுப்பிக்கவும். இது தற்போதுள்ள அனைவரையும் மாற்றும்; பதிவிறக்கியதன் நகலை முதலில் வைத்துக்கொள்ளுங்கள். உள்நுழைந்த உறுப்பினர்கள் கோப்பில் தொடர வேண்டும்.",
+ "admin.dataPersonsFile": "persons.csv",
+ "admin.dataRelationshipsFile": "relationships.csv",
+ "admin.dataImportAction": "இந்த முன்மாதிரியைப் புதுப்பி",
+ "admin.dataImported": "{people} பேரும் {relationships} உறவுப் பாதைகளும் ஏற்றப்பட்டன",
+ "admin.dataMoreErrors": "…மேலும் {n}",
+ "admin.dataSupabaseNote": "இது இந்த உலாவியில் உள்ள முன்மாதிரியை மட்டுமே புதுப்பிக்கும். உண்மையான தரவுத்தளத்தைப் புதுப்பிக்க, பதிவேற்றிய கோப்புகளை scripts/import-seed.mjs உடன் பயன்படுத்தவும், அல்லது முன்பு போல scripts/seed-to-sql.mjs வழியாக ஒட்டவும்."
 }

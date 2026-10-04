@@ -6,6 +6,7 @@ import { kinshipTerms } from './kinship-seed.js';
 import { buildGraph, isKnownMinor } from '../lib/graph.js';
 import { relationship } from '../lib/kinship.js';
 import * as familyEdit from '../lib/family-edit.js';
+import { personsToCSV, relationshipsToCSV, parsePersonsCSV, parseRelationshipsCSV } from '../lib/csv.js';
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 let lang = 'en';
@@ -169,4 +170,43 @@ export function addAnnouncement(a) {
   state.announcements.unshift({ id: `a${Date.now()}`, created_by: state.meId,
     sent_at: new Date().toISOString().slice(0, 10), ...a });
   changed();
+}
+
+// ─── Admin: family-data export/import (CSV, matching seed/persons.csv & relationships.csv) ──
+/** persons.csv and relationships.csv text for the current state. Admin only. */
+export function exportFamilyCSV() {
+  if (!isAdmin()) return null;
+  return { personsCSV: personsToCSV(state.persons), relationshipsCSV: relationshipsToCSV(state.relationships) };
+}
+
+/**
+ * Replaces the whole family with what's in the two uploaded CSVs. Admin only. Validates both
+ * files first and applies nothing if anything is wrong, so a bad edit in Excel cannot leave
+ * the prototype half updated.
+ */
+export function importFamilyCSV(personsText, relationshipsText) {
+  if (!isAdmin()) return { ok: false, errors: ['Only an admin can update the family data.'] };
+  const { persons, errors: personErrors } = parsePersonsCSV(personsText);
+  const personIds = new Set(persons.map((p) => p.id));
+  const { relationships, errors: relErrors } = parseRelationshipsCSV(relationshipsText, personIds);
+  const errors = [...personErrors, ...relErrors];
+
+  // Every signed-in member needs to keep a profile, or they'd be signed in as nobody.
+  for (const m of state.members) {
+    if (!personIds.has(m.person_id)) errors.push(`"${m.person_id}" is a signed-in member and must stay in persons.csv`);
+  }
+  // The §3 limit of two biological parents, re-checked across the whole file.
+  const byChild = new Map();
+  for (const r of relationships) {
+    if (r.type === 'parent_of' && r.subtype === 'biological') byChild.set(r.person_b, (byChild.get(r.person_b) ?? 0) + 1);
+  }
+  for (const [child, count] of byChild) {
+    if (count > 2) errors.push(`"${child}" has ${count} biological parents listed; at most two are allowed`);
+  }
+
+  if (errors.length) return { ok: false, errors };
+  state.persons = persons;
+  state.relationships = relationships;
+  changed();
+  return { ok: true, people: persons.length, relationships: relationships.length };
 }
