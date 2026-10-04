@@ -6,10 +6,15 @@
     "test:db": "tests/run.sh",
     "seed:import": "node scripts/import-seed.mjs",
     "seed:check": "psql -X -f scripts/integrity-report.sql",
-    "seed:sql": "node scripts/seed-to-sql.mjs"
+    "seed:sql": "node scripts/seed-to-sql.mjs",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "csv-parse": "5.6.0",
-    "pg": "8.13.1"
+    "pg": "8.13.1",
+    "vite": "^6.4.3"
   }
 }
