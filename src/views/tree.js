@@ -3,8 +3,9 @@
 // family-chart before Phase 1 settles on this.
 import { h, s, icon } from '../ui/dom.js';
 import { t } from '../i18n/index.js';
-import { state, graph, person } from '../data/store.js';
+import { state, graph, person, canEdit } from '../data/store.js';
 import { years } from '../ui/people.js';
+import { openPersonMenu } from '../ui/person-menu.js';
 
 const CARD_W = 168;
 const LINE_H = 18;
@@ -78,7 +79,7 @@ function card(n) {
     y += LINE_H;
     lines.push(s('text', { x: 12, y, class: 't-spouse', 'data-id': spouse.id }, `+ ${spouse.full_name ?? t('common.nameUnknown')}`));
   }
-  return s('g', { class: `node${late ? ' is-late' : ''}${isMe ? ' is-me' : ''}${p.name_known ? '' : ' is-unknown'}`,
+  return s('g', { class: `node${late ? ' is-late' : ''}${isMe ? ' is-me' : ''}${p.name_known ? '' : ' is-unknown'}${canEdit(p.id) ? ' is-editable' : ''}`,
     transform: `translate(${n.x} ${n.y})`, 'data-id': p.id, tabindex: '0', role: 'link', 'aria-label': p.full_name ?? t('common.nameUnknown') },
   s('rect', { width: CARD_W, height: n.h, rx: 10 }), ...lines);
 }
@@ -119,6 +120,17 @@ export function treeView(params) {
   const pointers = new Map();
   let moved = 0;
   let pinch = null;
+  let holdTimer = null;
+  let holdFired = false;
+  let heldNode = null;
+
+  const clearHold = () => {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+    heldNode?.classList.remove('is-holding');
+    heldNode = null;
+  };
+
   svg.addEventListener('pointerdown', (e) => {
     svg.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -126,6 +138,20 @@ export function treeView(params) {
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) };
+      clearHold();
+    } else if (pointers.size === 1) {
+      holdFired = false;
+      const node = e.target.closest?.('[data-id].is-editable');
+      if (node) {
+        heldNode = node;
+        node.classList.add('is-holding');
+        holdTimer = setTimeout(() => {
+          holdFired = true;
+          if (navigator.vibrate) navigator.vibrate(12);
+          openPersonMenu(node.dataset.id);
+          clearHold();
+        }, 480);
+      }
     }
   });
   svg.addEventListener('pointermove', (e) => {
@@ -144,6 +170,7 @@ export function treeView(params) {
       tx += cur.x - prev.x;
       ty += cur.y - prev.y;
       moved += Math.abs(cur.x - prev.x) + Math.abs(cur.y - prev.y);
+      if (moved > 6) clearHold();
       apply();
     }
   });
@@ -153,11 +180,18 @@ export function treeView(params) {
   };
   svg.addEventListener('pointerup', (e) => {
     release(e);
+    clearHold();
+    if (holdFired) { holdFired = false; return; }
     if (moved > 6) return;
     const hit = document.elementFromPoint(e.clientX, e.clientY)?.closest('[data-id]');
     if (hit) location.hash = `#/person/${hit.dataset.id}`;
   });
-  svg.addEventListener('pointercancel', release);
+  svg.addEventListener('pointercancel', (e) => { release(e); clearHold(); });
+  svg.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const hit = e.target.closest?.('[data-id].is-editable');
+    if (hit) openPersonMenu(hit.dataset.id);
+  });
   svg.addEventListener('wheel', (e) => {
     e.preventDefault();
     const box = svg.getBoundingClientRect();
@@ -165,7 +199,9 @@ export function treeView(params) {
   }, { passive: false });
   svg.addEventListener('keydown', (e) => {
     const id = e.target.closest?.('[data-id]')?.dataset.id;
-    if (id && (e.key === 'Enter' || e.key === ' ')) location.hash = `#/person/${id}`;
+    if (!id) return;
+    if (e.key === 'Enter' || e.key === ' ') location.hash = `#/person/${id}`;
+    else if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) { e.preventDefault(); openPersonMenu(id); }
   });
 
   const centre = () => {
@@ -181,7 +217,8 @@ export function treeView(params) {
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('tree.zoomIn'), onclick: () => zoomAt(1.25, ...centre()) }, icon('plus')),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => centreOn(state.meId) }, icon('target', 18), t('tree.findMe'))),
     svg,
-    h('p', { class: 'tree-hint small muted' }, t('tree.hint')));
+    h('p', { class: 'tree-hint small muted' }, t('tree.hint')),
+    h('p', { class: 'tree-hint small muted' }, t('tree.holdHint')));
 
   requestAnimationFrame(() => (nodes.some((n) => n.id === state.meId) ? centreOn(state.meId) : centreOn(rootId)));
   view.dataset.size = `${Math.round(width)}x${Math.round(height)}`;

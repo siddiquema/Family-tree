@@ -53,6 +53,8 @@ const ICONS = {
   admin: 'M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6zM9 12l2 2 4-4',
   plus: 'M12 5v14M5 12h14', minus: 'M5 12h14', target: 'M12 3v4M12 17v4M3 12h4M17 12h4M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6',
   back: 'M15 5 8 12l7 7',
+  edit: 'M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3zM13.5 7.5l3 3',
+  trash: 'M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M9.5 7l.6 12a1 1 0 0 0 1 1h5.8a1 1 0 0 0 1-1l.6-12M10.5 11v6M13.5 11v6',
 };
 export function icon(name, size = 22) {
   return s('svg', { viewBox: '0 0 24 24', width: size, height: size, 'aria-hidden': 'true', class: 'icon' },

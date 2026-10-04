@@ -139,5 +139,15 @@
  "role.member": "Member",
  "app.viewAs": "Viewing as",
  "app.prototypeFamily": "Prototype with the family from the 2011 spreadsheet. Changes are not saved.",
- "news.empty": "No announcements yet. Share the first family news."
+ "news.empty": "No announcements yet. Share the first family news.",
+ "tree.holdHint": "Press and hold anyone you can edit for more options.",
+ "menu.edit": "Edit details",
+ "menu.addParent": "Add a parent",
+ "menu.addChild": "Add a child",
+ "menu.addSpouse": "Add a spouse",
+ "menu.remove": "Remove from tree",
+ "menu.removeConfirmTitle": "Remove {name}?",
+ "menu.removeConfirmBody": "This removes {n} family link{s}: others linked only through them (e.g. a child or spouse) stay in the tree.",
+ "menu.removeConfirmAction": "Yes, remove",
+ "menu.removed": "{name} was removed"
 }

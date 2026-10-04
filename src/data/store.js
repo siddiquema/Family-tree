@@ -5,6 +5,7 @@ import * as demo from '@family-data';
 import { kinshipTerms } from './kinship-seed.js';
 import { buildGraph, isKnownMinor } from '../lib/graph.js';
 import { relationship } from '../lib/kinship.js';
+import * as familyEdit from '../lib/family-edit.js';
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 let lang = 'en';
@@ -62,6 +63,33 @@ export function canEdit(id) {
   if (g.parentsOf(id).some((p) => p.id === state.meId)) return true;
   if (isKnownMinor(target)) return false;
   return id === state.meId || g.spousesOf(id).some((s) => s.id === state.meId && s.status === 'married');
+}
+
+/** Adding a relative to someone is part of editing their branch, so the same rule applies. */
+export const canAddRelative = canEdit;
+/** Whether a biological parent can still be added (the §3 two-parent limit). */
+export const canAddParentTo = (id) => familyEdit.canAddParent(state.relationships, id);
+/** Removing a person matches the database's admin-only delete policy. Never your own record. */
+export function canDelete(id) { return isAdmin() && id !== state.meId; }
+export const linkCountOf = (id) => familyEdit.linkCount(state.relationships, id);
+
+/** Adds a blank placeholder relative (§5 "Add upward/downward") and returns the new person's id. */
+export function addFamilyMember(id, kind) {
+  if (!canAddRelative(id)) return null;
+  let newPersonId = null;
+  if (kind === 'parent') newPersonId = familyEdit.addParent(state.persons, state.relationships, id);
+  else if (kind === 'child') newPersonId = familyEdit.addChild(state.persons, state.relationships, id);
+  else if (kind === 'spouse') newPersonId = familyEdit.addSpouse(state.persons, state.relationships, id);
+  if (newPersonId) changed();
+  return newPersonId;
+}
+
+/** Removes a person and the relationships that name them. Admin only, never the signed-in person. */
+export function deletePerson(id) {
+  if (!canDelete(id)) return false;
+  const ok = familyEdit.removePerson(state.persons, state.relationships, id);
+  if (ok) changed();
+  return ok;
 }
 
 /** §4.2 phone visibility: self, immediate family, else who to ask. Admins get no special access. */

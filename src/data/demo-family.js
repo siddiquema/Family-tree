@@ -55,7 +55,7 @@ export const relationships = [
   wed('p01', 'p02'), ...kids('p01', 'p02', 'p03', 'p05', 'p06'),
   wed('p03', 'p04'), ...kids('p03', 'p04', 'p08', 'p10', 'p11'),
   wed('p06', 'p07'), ...kids('p07', 'p06', 'p14'),
-  wed('p08', 'p09'), ...kids('p08', 'p09', 'p16', 'p18', 'p20'),
+  wed('p08', 'p09', 'widowed'), ...kids('p08', 'p09', 'p16', 'p18', 'p20'),
   wed('p11', 'p12', 'widowed'), ...kids('p11', 'p12', 'p22'),
   wed('p11', 'p13'), ...kids('p11', 'p13', 'p23'),
   wed('p14', 'p15'), ...kids('p14', 'p15', 'p24', 'p25'),
