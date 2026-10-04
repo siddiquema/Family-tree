@@ -76,6 +76,8 @@ export const members = [
   { person_id: 'p32', role: 'member' },
 ];
 export const me = 'p27';
+export const source = 'demo';
+export const noWhatsapp = ['p18'];
 
 // Dummy numbers only. Visibility is decided by the same immediate-family rule as the database.
 export const contacts = {

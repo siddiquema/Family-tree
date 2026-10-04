@@ -12,6 +12,15 @@ import { adminView } from './views/admin.js';
 
 const root = document.getElementById('app');
 
+// Members who have joined; with only one (the real family so far), any living named person,
+// so the prototype can still show what a relative would see.
+function viewAsOptions() {
+  if (state.members.length > 1) return state.members.map((m) => [m.person_id, `${person(m.person_id).full_name} · ${t(`role.${m.role}`)}`]);
+  return state.persons.filter((p) => p.name_known && p.is_living !== false)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+    .map((p) => [p.id, p.id === state.members[0]?.person_id ? `${p.full_name} · ${t('role.admin')}` : p.full_name]);
+}
+
 function parseHash() {
   const [path, query = ''] = location.hash.replace(/^#/, '').split('?');
   return { parts: (path || '/').split('/').filter(Boolean), params: new URLSearchParams(query) };
@@ -37,11 +46,10 @@ function render() {
   const scroll = view.classList.contains('tree-page') ? 0 : window.scrollY;
 
   root.replaceChildren(
-    h('div', { class: 'proto-banner' }, h('span', {}, t('app.prototype')),
+    h('div', { class: 'proto-banner' }, h('span', {}, t(state.source === 'seed' ? 'app.prototypeFamily' : 'app.prototype')),
       state.signedIn ? h('label', { class: 'view-as' }, t('app.viewAs'), ' ',
         h('select', { id: 'view-as', onchange: (e) => { viewAs(e.target.value); location.hash = '#/'; } },
-          state.members.map((m) => h('option', { value: m.person_id, selected: m.person_id === state.meId },
-            `${person(m.person_id).full_name} · ${t(`role.${m.role}`)}`)))) : null),
+          viewAsOptions().map(([id, label]) => h('option', { value: id, selected: id === state.meId }, label)))) : null),
     h('header', { class: 'topbar' },
       parseHash().parts[0] === 'person'
         ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Back', onclick: () => history.back() }, icon('back'))

@@ -1,7 +1,7 @@
 // App state for the prototype, backed by the demo family in memory.
 // Phase 1 replaces the loading and the mutations with Supabase calls; the screens only use
 // the functions exported here, and the database's access rules stay the real enforcement.
-import * as demo from './demo-family.js';
+import * as demo from '@family-data';
 import { kinshipTerms } from './kinship-seed.js';
 import { buildGraph, isKnownMinor } from '../lib/graph.js';
 import { relationship } from '../lib/kinship.js';
@@ -18,7 +18,8 @@ export const state = {
   relationships: clone(demo.relationships),
   members: clone(demo.members),
   contacts: clone(demo.contacts),
-  noWhatsapp: new Set(['p18']),
+  noWhatsapp: new Set(demo.noWhatsapp ?? []),
+  source: demo.source ?? 'demo',
   announcements: clone(demo.announcements),
   editRequests: clone(demo.editRequests),
   terms: clone(kinshipTerms),

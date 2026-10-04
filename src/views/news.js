@@ -12,6 +12,7 @@ export function newsView(params) {
       h('h1', {}, t('news.title')),
       composing ? null : h('a', { class: 'btn btn-primary btn-sm', href: '#/news?new=1' }, t('news.new'))),
     composing ? compose() : null,
+    !state.announcements.length && !composing ? h('p', { class: 'card muted' }, t('news.empty')) : null,
     state.announcements.map((a) => {
       const shareText = `${a.title}\n${a.body ?? ''}`.trim();
       return h('article', { class: 'card news-item' },

@@ -16,7 +16,7 @@
  "login.demo": "Explore the sample family",
  "login.demoNote": "In this prototype any details will sign you in as Arif, an admin.",
  "home.greeting": "Assalamu alaikum, {name}",
- "home.stats": "{people} people in the tree · {joined} relatives have joined",
+ "home.stats": "{people} people in the tree · joined so far: {joined}",
  "home.nudges": "Help complete your family",
  "home.nudgesDone": "Your close family's details are complete.",
  "home.close": "Your close family",
@@ -137,5 +137,7 @@
  "role.admin": "Admin",
  "role.branch_owner": "Branch owner",
  "role.member": "Member",
- "app.viewAs": "Viewing as"
+ "app.viewAs": "Viewing as",
+ "app.prototypeFamily": "Prototype with the family from the 2011 spreadsheet. Changes are not saved.",
+ "news.empty": "No announcements yet. Share the first family news."
 }
