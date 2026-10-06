@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "test:db": "tests/run.sh",
-    "seed:import": "node scripts/import-seed.mjs",
+    "seed:import": "node --env-file-if-exists=.env scripts/import-seed.mjs",
     "seed:check": "psql -X -f scripts/integrity-report.sql",
-    "seed:sql": "node scripts/seed-to-sql.mjs",
+    "seed:sql": "node --env-file-if-exists=.env scripts/seed-to-sql.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

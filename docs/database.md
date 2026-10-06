@@ -113,9 +113,14 @@ That keeps the approval step and the audit trail for every outside change. Most 
 
 ## Running
 
+Copy `.env.example` to `.env` (gitignored) and fill in `DATABASE_URL` (Supabase → Project Settings →
+Database → Connect → **Session pooler**) and `FAMILY_NAME`. `npm run seed:import` and `npm run seed:sql`
+pick it up automatically (`node --env-file-if-exists=.env`); without a `.env`, pass the same variables
+inline instead.
+
 ```
 tests/run.sh                                # needs local PostgreSQL 15+; builds a fresh DB per test file
-DATABASE_URL=… FAMILY_NAME=… npm run seed:import
+npm run seed:import                         # loads seed/persons.csv + relationships.csv into Supabase
 psql "$DATABASE_URL" -X -f scripts/integrity-report.sql
 ```
 `tests/supabase_shim.sql` stands in for Supabase's `auth` schema and roles in local tests only. Never apply it to a real project.
