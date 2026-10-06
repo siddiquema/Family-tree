@@ -30,15 +30,22 @@ export function newsView(params) {
 }
 
 function compose() {
-  const form = h('form', { class: 'card form', onsubmit: (e) => {
+  const form = h('form', { class: 'card form', onsubmit: async (e) => {
     e.preventDefault();
     const d = new FormData(form);
-    addAnnouncement({
-      type: d.get('type'), title: String(d.get('title')).trim(), body: String(d.get('body')).trim(),
-      event_date: d.get('event_date') || null, audience: d.get('audience') === 'all' ? 'all' : 'selected',
-    });
-    toast(t('news.sent'));
-    location.hash = '#/news';
+    const btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await addAnnouncement({
+        type: d.get('type'), title: String(d.get('title')).trim(), body: String(d.get('body')).trim(),
+        event_date: d.get('event_date') || null, audience: d.get('audience') === 'all' ? 'all' : 'selected',
+      });
+      toast(t('news.sent'));
+      location.hash = '#/news';
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message ?? t('common.error'));
+    }
   } });
   const preview = h('p', { class: 'note', 'aria-live': 'polite' });
   const anchorWrap = h('div', { class: 'stack', hidden: true });

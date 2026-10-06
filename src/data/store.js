@@ -1,31 +1,33 @@
-// App state for the prototype, backed by the demo family in memory.
-// Phase 1 replaces the loading and the mutations with Supabase calls; the screens only use
-// the functions exported here, and the database's access rules stay the real enforcement.
-import * as demo from '@family-data';
-import { kinshipTerms } from './kinship-seed.js';
+// App state, backed by the real Supabase project (supabase/migrations/). Phase 0's access rules
+// are the real enforcement; everything client-side here (canEdit, isAdmin, contactView…) is a
+// convenience mirror of those rules so the UI can react without round-tripping every check.
+import { supabase } from '../lib/supabaseClient.js';
 import { buildGraph, isKnownMinor } from '../lib/graph.js';
 import { relationship } from '../lib/kinship.js';
 import * as familyEdit from '../lib/family-edit.js';
 import { personsToCSV, relationshipsToCSV, parsePersonsCSV, parseRelationshipsCSV } from '../lib/csv.js';
 
-const clone = (x) => JSON.parse(JSON.stringify(x));
 let lang = 'en';
 try { lang = localStorage.getItem('ft.lang') === 'ta' ? 'ta' : 'en'; } catch { /* storage blocked: default */ }
 
 export const state = {
   lang,
-  signedIn: false,
-  meId: demo.me,
-  persons: clone(demo.persons),
-  relationships: clone(demo.relationships),
-  members: clone(demo.members),
-  contacts: clone(demo.contacts),
-  noWhatsapp: new Set(demo.noWhatsapp ?? []),
-  source: demo.source ?? 'demo',
-  announcements: clone(demo.announcements),
-  editRequests: clone(demo.editRequests),
-  terms: clone(kinshipTerms),
-  missing: new Map(),          // kinship_missing: path → lookups
+  signedIn: false,   // a Supabase session exists
+  ready: false,      // and the family's data has finished loading
+  authError: null,
+  userId: null,
+  familyId: null,
+  meId: null,
+  persons: [],
+  relationships: [],
+  members: [],
+  contacts: {},        // person_id -> { phone, phone_hidden } for whatever RLS lets this viewer see
+  noWhatsapp: new Set(),
+  source: 'supabase',
+  announcements: [],
+  editRequests: [],
+  terms: [],
+  missing: new Map(),  // kinship_missing: path -> lookups, seeded from the table, grows locally too
 };
 
 const listeners = new Set();
@@ -45,18 +47,96 @@ export function setLang(value) {
   document.documentElement.lang = value;
   changed();
 }
-export function signIn() { state.signedIn = true; changed(); }
-/** Prototype only: see the app as another member, to check what each relative can see and do. */
-export function viewAs(personId) { state.meId = personId; changed(); }
-export function signOut() { state.signedIn = false; changed(); }
 
+// ─── Auth and loading ────────────────────────────────────────────────────────
+/** Email or phone, whichever the member signed up with (§5a). */
+export async function signInWithPassword(idOrPhone, password) {
+  state.authError = null;
+  const isEmail = idOrPhone.includes('@');
+  const { error } = await supabase.auth.signInWithPassword(
+    isEmail ? { email: idOrPhone.trim(), password } : { phone: idOrPhone.trim(), password });
+  if (error) { state.authError = error.message; changed(); return false; }
+  await loadEverything();
+  return true;
+}
+
+export async function signOut() {
+  await supabase.auth.signOut();
+  Object.assign(state, {
+    signedIn: false, ready: false, userId: null, familyId: null, meId: null,
+    persons: [], relationships: [], members: [], contacts: {}, noWhatsapp: new Set(),
+    announcements: [], editRequests: [], terms: [], missing: new Map(),
+  });
+  changed();
+}
+
+/** Resumes an existing browser session (page reload) without asking for the password again. */
+export async function resumeSession() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) { state.signedIn = true; await loadEverything(); }
+  else changed();
+}
+
+async function loadEverything() {
+  state.signedIn = true;
+  const { data: { user } } = await supabase.auth.getUser();
+  state.userId = user.id;
+
+  const { data: mine, error: meErr } = await supabase.from('members')
+    .select('family_id, person_id, role, ui_language').eq('user_id', user.id).single();
+  if (meErr || !mine) {
+    state.authError = 'This login is not linked to a family yet. Ask an admin to add you.';
+    state.signedIn = false;
+    changed();
+    return;
+  }
+  state.familyId = mine.family_id;
+  state.meId = mine.person_id;
+  if (mine.ui_language) setLang(mine.ui_language);
+
+  await reloadCore();
+  const { data: missingRows } = await supabase.from('kinship_missing').select('path, lookups').eq('family_id', state.familyId);
+  state.missing = new Map((missingRows ?? []).map((r) => [r.path, r.lookups]));
+
+  state.ready = true;
+  changed();
+}
+
+/** Re-fetches everything a mutation could have changed. Simple and correct beats clever for a family this size. */
+async function reloadCore() {
+  const fid = state.familyId;
+  const [persons, relationships, members, contacts, terms, announcements, editRequests] = await Promise.all([
+    supabase.from('persons').select('*').eq('family_id', fid).order('created_at'),
+    supabase.from('relationships').select('*').eq('family_id', fid),
+    supabase.from('members').select('user_id, person_id, role').eq('family_id', fid),
+    supabase.from('person_contacts').select('person_id, phone, phone_hidden, has_whatsapp').eq('family_id', fid),
+    supabase.from('kinship_terms').select('*').eq('family_id', fid),
+    supabase.from('announcements').select('*').eq('family_id', fid).order('created_at', { ascending: false }),
+    supabase.from('edit_requests').select('*').eq('family_id', fid).order('created_at', { ascending: false }),
+  ]);
+  state.persons = persons.data ?? [];
+  state.relationships = relationships.data ?? [];
+  state.members = members.data ?? [];
+  state.contacts = Object.fromEntries((contacts.data ?? []).map((c) => [c.person_id, c]));
+  state.noWhatsapp = new Set((contacts.data ?? []).filter((c) => c.has_whatsapp === false).map((c) => c.person_id));
+  state.terms = terms.data ?? [];
+  state.announcements = announcements.data ?? [];
+  state.editRequests = editRequests.data ?? [];
+  changed();
+}
+
+// ─── Reads (unchanged logic from the prototype; now reading real data) ──────
 export function relationTo(id, from = state.meId) {
   const r = relationship(graph(), state.terms, from, id);
-  if (r.kind === 'described' && r.recordable) state.missing.set(r.path, (state.missing.get(r.path) ?? 0) + 1);
+  if (r.kind === 'described' && r.recordable) {
+    state.missing.set(r.path, (state.missing.get(r.path) ?? 0) + 1);
+    supabase.rpc('record_missing_kinship', { fid: state.familyId, kin_path: r.path }).then(() => {});
+  }
   return r;
 }
 
-/** §5 edit rights, same rule as app.can_edit_person() in the database. */
+/** §5 edit rights, same rule as app.can_edit_person() in the database. A UI shortcut only — the
+ *  database's row-level security is what actually stops a disallowed write. */
 export function canEdit(id) {
   if (isAdmin()) return true;
   const g = graph();
@@ -65,46 +145,22 @@ export function canEdit(id) {
   if (isKnownMinor(target)) return false;
   return id === state.meId || g.spousesOf(id).some((s) => s.id === state.meId && s.status === 'married');
 }
-
-/** Adding a relative to someone is part of editing their branch, so the same rule applies. */
 export const canAddRelative = canEdit;
-/** Whether a biological parent can still be added (the §3 two-parent limit). */
 export const canAddParentTo = (id) => familyEdit.canAddParent(state.relationships, id);
-/** Removing a person matches the database's admin-only delete policy. Never your own record. */
 export function canDelete(id) { return isAdmin() && id !== state.meId; }
 export const linkCountOf = (id) => familyEdit.linkCount(state.relationships, id);
 
-/** Adds a blank placeholder relative (§5 "Add upward/downward") and returns the new person's id. */
-export function addFamilyMember(id, kind) {
-  if (!canAddRelative(id)) return null;
-  let newPersonId = null;
-  if (kind === 'parent') newPersonId = familyEdit.addParent(state.persons, state.relationships, id);
-  else if (kind === 'child') newPersonId = familyEdit.addChild(state.persons, state.relationships, id);
-  else if (kind === 'spouse') newPersonId = familyEdit.addSpouse(state.persons, state.relationships, id);
-  if (newPersonId) changed();
-  return newPersonId;
-}
-
-/** Removes a person and the relationships that name them. Admin only, never the signed-in person. */
-export function deletePerson(id) {
-  if (!canDelete(id)) return false;
-  const ok = familyEdit.removePerson(state.persons, state.relationships, id);
-  if (ok) changed();
-  return ok;
-}
-
-/** §4.2 phone visibility: self, immediate family, else who to ask. Admins get no special access. */
+/** §4.2 phone visibility. `state.contacts` only ever holds what row-level security returned for
+ *  this viewer, so "not present" already means "not allowed to see" — no extra check needed. */
 export function contactView(id) {
   const c = state.contacts[id];
   if (id === state.meId) return { kind: 'self', phone: c?.phone, hidden: c?.phone_hidden };
-  if (!c?.phone) return { kind: 'none' };
+  if (c?.phone) return { kind: 'visible', phone: c.phone };
   const g = graph();
-  if (!c.phone_hidden && g.isImmediateFamily(state.meId, id)) return { kind: 'visible', phone: c.phone };
   const holders = state.members.map((m) => m.person_id).filter((pid) => pid !== id && g.isImmediateFamily(pid, id));
-  return { kind: 'ask', askId: c.phone_hidden ? null : holders[0] ?? null };
+  return { kind: holders.length || !c ? 'ask' : 'none', askId: holders[0] ?? null };
 }
 
-/** Missing-info prompts for the people closest to me (§5 nudges). */
 export function nudges(limit = 4) {
   const g = graph();
   const close = [
@@ -125,31 +181,6 @@ export function nudges(limit = 4) {
   return out.slice(0, limit);
 }
 
-export function updatePerson(id, changes) {
-  Object.assign(person(id), changes);
-  changed();
-}
-
-export function suggestEdit(id, changes) {
-  state.editRequests.unshift({ id: `e${Date.now()}`, target_person_id: id, submitted_by: state.meId,
-    status: 'pending', created_at: new Date().toISOString().slice(0, 10), proposed_changes: changes });
-  changed();
-}
-
-export function reviewEdit(requestId, approve) {
-  const req = state.editRequests.find((r) => r.id === requestId);
-  if (!req || req.submitted_by === state.meId) return;
-  req.status = approve ? 'approved' : 'rejected';
-  if (approve) Object.assign(person(req.target_person_id), req.proposed_changes);
-  changed();
-}
-
-export function setVerified(path, verified) {
-  const t = state.terms.find((x) => x.path === path);
-  if (t && t.label_ta_local) { t.is_verified = verified; changed(); }
-}
-
-/** Recipients for an announcement: all members, a branch (descendants of X), or X's immediate family. */
 export function recipients(audience, anchorId) {
   const g = graph();
   let ids;
@@ -166,36 +197,94 @@ export function recipients(audience, anchorId) {
   return { count: ids.length, sms: ids.filter((id) => state.noWhatsapp.has(id)).length };
 }
 
-export function addAnnouncement(a) {
-  state.announcements.unshift({ id: `a${Date.now()}`, created_by: state.meId,
-    sent_at: new Date().toISOString().slice(0, 10), ...a });
-  changed();
+// ─── Writes: each persists to Supabase, then reloads the shared tables ──────
+export async function updatePerson(id, changes) {
+  const { error } = await supabase.from('persons').update(changes).eq('id', id);
+  if (error) throw error;
+  await reloadCore();
 }
 
-// ─── Admin: family-data export/import (CSV, matching seed/persons.csv & relationships.csv) ──
-/** persons.csv and relationships.csv text for the current state. Admin only. */
+export async function addFamilyMember(id, kind) {
+  if (!canAddRelative(id)) return null;
+  const { data: row, error: insErr } = await supabase.from('persons')
+    .insert({ family_id: state.familyId, name_known: false, created_by: state.userId }).select('id').single();
+  if (insErr) throw insErr;
+  const newId = row.id;
+  const links = kind === 'parent' ? [{ person_a: newId, person_b: id, type: 'parent_of', subtype: 'biological' }]
+    : kind === 'spouse' ? [{ person_a: [id, newId].sort()[0], person_b: [id, newId].sort()[1], type: 'spouse_of', status: 'married' }]
+    : (() => {
+        const spouses = graph().spousesOf(id).filter((s) => s.status === 'married');
+        const rows = [{ person_a: id, person_b: newId, type: 'parent_of', subtype: 'biological' }];
+        if (spouses.length === 1) rows.push({ person_a: spouses[0].id, person_b: newId, type: 'parent_of', subtype: 'biological' });
+        return rows;
+      })();
+  const { error: relErr } = await supabase.from('relationships').insert(links.map((l) => ({ ...l, family_id: state.familyId, created_by: state.userId })));
+  if (relErr) { await supabase.from('persons').delete().eq('id', newId); throw relErr; }
+  await reloadCore();
+  return newId;
+}
+
+export async function deletePerson(id) {
+  if (!canDelete(id)) return false;
+  const { error } = await supabase.from('persons').delete().eq('id', id);
+  if (error) throw error;
+  await reloadCore();
+  return true;
+}
+
+export async function suggestEdit(id, changes) {
+  const { error } = await supabase.from('edit_requests')
+    .insert({ family_id: state.familyId, target_person_id: id, proposed_changes: changes, submitted_by: state.userId });
+  if (error) throw error;
+  await reloadCore();
+}
+
+export async function reviewEdit(requestId, approve) {
+  const req = state.editRequests.find((r) => r.id === requestId);
+  if (!req || req.submitted_by === state.userId) return;
+  const { error } = await supabase.from('edit_requests')
+    .update({ status: approve ? 'approved' : 'rejected', reviewed_by: state.userId, reviewed_at: new Date().toISOString() })
+    .eq('id', requestId);
+  if (error) throw error;
+  if (approve) await updatePerson(req.target_person_id, req.proposed_changes);
+  else await reloadCore();
+}
+
+export async function setVerified(path, verified) {
+  const t = state.terms.find((x) => x.path === path);
+  if (!t || !t.label_ta_local) return;
+  const { error } = await supabase.from('kinship_terms').update({ is_verified: verified }).eq('id', t.id);
+  if (error) throw error;
+  await reloadCore();
+}
+
+/** Stored as pending_approval regardless of role: the database only lets a server-side
+ *  Edge Function (not yet built — §5b) flip status to 'sent', so this never reaches the wider
+ *  family's feed on its own yet. It's still saved, and the sender/admins can see their own draft. */
+export async function addAnnouncement(a) {
+  const { error } = await supabase.from('announcements')
+    .insert({ family_id: state.familyId, created_by: state.userId, status: 'pending_approval', ...a });
+  if (error) throw error;
+  await reloadCore();
+}
+
+// ─── Admin: CSV (Excel round trip). Export reflects the live data; import stays local to this
+// browser tab only — real changes to Supabase still go through scripts/import-seed.mjs (docs/
+// database.md), so an Excel mistake can never silently overwrite the shared family tree. ──────
 export function exportFamilyCSV() {
   if (!isAdmin()) return null;
   return { personsCSV: personsToCSV(state.persons), relationshipsCSV: relationshipsToCSV(state.relationships) };
 }
 
-/**
- * Replaces the whole family with what's in the two uploaded CSVs. Admin only. Validates both
- * files first and applies nothing if anything is wrong, so a bad edit in Excel cannot leave
- * the prototype half updated.
- */
 export function importFamilyCSV(personsText, relationshipsText) {
   if (!isAdmin()) return { ok: false, errors: ['Only an admin can update the family data.'] };
   const { persons, errors: personErrors } = parsePersonsCSV(personsText);
   const personIds = new Set(persons.map((p) => p.id));
   const { relationships, errors: relErrors } = parseRelationshipsCSV(relationshipsText, personIds);
   const errors = [...personErrors, ...relErrors];
-
-  // Every signed-in member needs to keep a profile, or they'd be signed in as nobody.
   for (const m of state.members) {
     if (!personIds.has(m.person_id)) errors.push(`"${m.person_id}" is a signed-in member and must stay in persons.csv`);
   }
-  // The §3 limit of two biological parents, re-checked across the whole file.
   const byChild = new Map();
   for (const r of relationships) {
     if (r.type === 'parent_of' && r.subtype === 'biological') byChild.set(r.person_b, (byChild.get(r.person_b) ?? 0) + 1);
@@ -203,7 +292,6 @@ export function importFamilyCSV(personsText, relationshipsText) {
   for (const [child, count] of byChild) {
     if (count > 2) errors.push(`"${child}" has ${count} biological parents listed; at most two are allowed`);
   }
-
   if (errors.length) return { ok: false, errors };
   state.persons = persons;
   state.relationships = relationships;

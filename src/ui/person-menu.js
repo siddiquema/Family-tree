@@ -29,9 +29,13 @@ export function openPersonMenu(id) {
   openActionSheet({ title: nameOf(p), items, cancelLabel: t('common.cancel') });
 }
 
-function addAndEdit(id, kind) {
-  const newPersonId = addFamilyMember(id, kind);
-  if (newPersonId) location.hash = `#/person/${newPersonId}?edit=1`;
+async function addAndEdit(id, kind) {
+  try {
+    const newPersonId = await addFamilyMember(id, kind);
+    if (newPersonId) location.hash = `#/person/${newPersonId}?edit=1`;
+  } catch (err) {
+    toast(err.message ?? t('common.error'));
+  }
 }
 
 function confirmRemove(id) {
@@ -42,11 +46,15 @@ function confirmRemove(id) {
     subtitle: linked ? t('menu.removeConfirmBody', { n: linked, s: linked === 1 ? '' : 's' }) : null,
     items: [{
       icon: 'trash', label: t('menu.removeConfirmAction'), danger: true,
-      onSelect: () => {
-        const ok = deletePerson(id);
-        if (ok) {
-          toast(t('menu.removed', { name: nameOf(p) }));
-          if (location.hash.startsWith(`#/person/${id}`)) location.hash = '#/';
+      onSelect: async () => {
+        try {
+          const ok = await deletePerson(id);
+          if (ok) {
+            toast(t('menu.removed', { name: nameOf(p) }));
+            if (location.hash.startsWith(`#/person/${id}`)) location.hash = '#/';
+          }
+        } catch (err) {
+          toast(err.message ?? t('common.error'));
         }
       },
     }],

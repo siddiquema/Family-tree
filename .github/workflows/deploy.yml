@@ -1,8 +1,9 @@
-name: Deploy demo prototype to GitHub Pages
+name: Deploy to GitHub Pages
 
-# Builds and publishes ONLY the public demo: src/data/demo-family.js, an invented family
-# (CLAUDE.md §9). The real family's data lives outside this repo and is never built here —
-# that version only ever runs from a file on Siddique's own machine.
+# Builds the real app (src/) and publishes it as a static site. No family data is built in — the
+# app loads everything live from Supabase at runtime, behind sign-in and row-level security
+# (supabase/migrations/). The published URL and public anon key are meant to be public
+# (src/config.js); they grant no access on their own.
 #
 # One-time manual step (cannot be done from this workflow): in the repo's
 # Settings → Pages, set "Build and deployment → Source" to "GitHub Actions".

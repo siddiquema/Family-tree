@@ -75,7 +75,7 @@ function phoneBlock(id) {
 }
 
 function editForm(p, mode) {
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const data = new FormData(e.target);
     const changes = {};
@@ -87,11 +87,17 @@ function editForm(p, mode) {
     }
     if (changes.full_name !== undefined) changes.name_known = !!changes.full_name;
     if (changes.death_year) changes.is_living = false;
-    if (Object.keys(changes).length) {
-      if (mode === 'edit') { updatePerson(p.id, changes); toast(t('person.saved')); }
-      else { suggestEdit(p.id, changes); toast(t('person.sent')); }
+    if (!Object.keys(changes).length) { location.hash = `#/person/${p.id}`; return; }
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      if (mode === 'edit') { await updatePerson(p.id, changes); toast(t('person.saved')); }
+      else { await suggestEdit(p.id, changes); toast(t('person.sent')); }
+      location.hash = `#/person/${p.id}`;
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message ?? t('common.error'));
     }
-    location.hash = `#/person/${p.id}`;
   };
   const field = (key, type = 'text') => [
     h('label', { for: `f-${key}` }, t(`field.${key}`)),

@@ -1,23 +1,31 @@
-import { h } from '../ui/dom.js';
+import { h, toast } from '../ui/dom.js';
 import { t } from '../i18n/index.js';
-import { signIn } from '../data/store.js';
+import { state, signInWithPassword } from '../data/store.js';
 
 export function loginView() {
-  const submit = (e) => { e.preventDefault(); signIn(); location.hash = '#/'; };
+  const submit = async (e) => {
+    e.preventDefault();
+    const data = new FormData(e.target);
+    const id = String(data.get('id') ?? '').trim();
+    const password = String(data.get('password') ?? '');
+    if (!id || !password) return;
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    const ok = await signInWithPassword(id, password);
+    btn.disabled = false;
+    if (!ok) toast(state.authError ?? t('login.failed'));
+  };
   return h('main', { class: 'login' },
     h('div', { class: 'login-mark', 'aria-hidden': 'true' }, treeMark()),
     h('h1', { class: 'login-title' }, t('app.name')),
     h('p', { class: 'muted' }, t('login.invite')),
     h('form', { class: 'card form', onsubmit: submit },
       h('label', { for: 'login-id' }, t('login.id')),
-      h('input', { id: 'login-id', name: 'id', autocomplete: 'username', inputmode: 'email', placeholder: '+91 … / name@example.com' }),
+      h('input', { id: 'login-id', name: 'id', autocomplete: 'username', inputmode: 'email', required: true, placeholder: '+91 … / name@example.com' }),
       h('label', { for: 'login-password' }, t('login.password')),
-      h('input', { id: 'login-password', name: 'password', type: 'password', autocomplete: 'current-password', minlength: '12' }),
+      h('input', { id: 'login-password', name: 'password', type: 'password', autocomplete: 'current-password', required: true }),
       h('button', { class: 'btn btn-primary', type: 'submit' }, t('login.submit'))),
-    h('p', { class: 'small muted' }, t('login.forgot')),
-    h('div', { class: 'demo-box' },
-      h('button', { class: 'btn btn-ghost', type: 'button', onclick: submit }, t('login.demo')),
-      h('p', { class: 'small muted' }, t('login.demoNote'))));
+    h('p', { class: 'small muted' }, t('login.forgot')));
 }
 
 function treeMark() {

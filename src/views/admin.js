@@ -13,7 +13,7 @@ export function adminView() {
   return h('main', { class: 'page' },
     h('header', { class: 'page-head row-between' },
       h('h1', {}, t('admin.title')),
-      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { signOut(); location.hash = '#/login'; } }, t('admin.signOut'))),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { signOut(); location.hash = '#/'; } }, t('admin.signOut'))),
 
     dataSection(),
 
@@ -37,7 +37,7 @@ export function adminView() {
             : h('span', { class: 'small muted' }, t('admin.noLocal'))),
         term.label_ta_local
           ? h('button', { class: `btn btn-sm ${term.is_verified ? 'btn-ghost' : 'btn-primary'}`, type: 'button',
-            onclick: () => setVerified(term.path, !term.is_verified) },
+            onclick: () => setVerified(term.path, !term.is_verified).catch((err) => toast(err.message ?? t('common.error'))) },
           term.is_verified ? t('admin.undo') : t('admin.confirm'))
           : null)))),
 
@@ -115,6 +115,6 @@ function editCard(r) {
     own
       ? h('p', { class: 'small muted' }, t('admin.ownSuggestion'))
       : h('div', { class: 'row' },
-        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => reviewEdit(r.id, false) }, t('admin.reject')),
-        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => reviewEdit(r.id, true) }, t('admin.approve'))));
+        h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => reviewEdit(r.id, false).catch((err) => toast(err.message ?? t('common.error'))) }, t('admin.reject')),
+        h('button', { class: 'btn btn-primary', type: 'button', onclick: () => reviewEdit(r.id, true).catch((err) => toast(err.message ?? t('common.error'))) }, t('admin.approve'))));
 }
