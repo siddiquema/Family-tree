@@ -152,9 +152,14 @@ export function canEdit(id) {
   return id === state.meId || g.spousesOf(id).some((s) => s.id === state.meId && s.status === 'married');
 }
 export const canAddRelative = canEdit;
-export const canAddParentTo = (id) => familyEdit.canAddParent(state.relationships, id);
+/** Non-admins stay capped at two biological parents (§3). For now, an admin can add a parent of
+ *  any subtype even past that cap — e.g. a step-parent beside two biological ones — so a fuller
+ *  tree (remarriages, adoptions) can be entered while importing data from elsewhere. The database
+ *  still enforces the real limit: a third *biological* parent is rejected regardless of role. */
+export const canAddParentTo = (id) => isAdmin() || familyEdit.canAddParent(state.relationships, id);
 export function canDelete(id) { return isAdmin() && id !== state.meId; }
 export const linkCountOf = (id) => familyEdit.linkCount(state.relationships, id);
+export const biologicalParentCountOf = (id) => familyEdit.biologicalParentCount(state.relationships, id);
 
 /** §4.2 phone visibility. `state.contacts` only ever holds what row-level security returned for
  *  this viewer, so "not present" already means "not allowed to see" — no extra check needed. */
@@ -210,13 +215,13 @@ export async function updatePerson(id, changes) {
   await reloadCore();
 }
 
-export async function addFamilyMember(id, kind) {
+export async function addFamilyMember(id, kind, parentSubtype = 'biological') {
   if (!canAddRelative(id)) return null;
   const { data: row, error: insErr } = await supabase.from('persons')
     .insert({ family_id: state.familyId, name_known: false, created_by: state.userId }).select('id').single();
   if (insErr) throw insErr;
   const newId = row.id;
-  const links = kind === 'parent' ? [{ person_a: newId, person_b: id, type: 'parent_of', subtype: 'biological' }]
+  const links = kind === 'parent' ? [{ person_a: newId, person_b: id, type: 'parent_of', subtype: parentSubtype }]
     : kind === 'spouse' ? [{ person_a: [id, newId].sort()[0], person_b: [id, newId].sort()[1], type: 'spouse_of', status: 'married' }]
     : (() => {
         const spouses = graph().spousesOf(id).filter((s) => s.status === 'married');
