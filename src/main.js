@@ -9,6 +9,7 @@ import { personView } from './views/person.js';
 import { relationView } from './views/relation.js';
 import { newsView } from './views/news.js';
 import { adminView } from './views/admin.js';
+import { joinView } from './views/join.js';
 
 const root = document.getElementById('app');
 
@@ -19,6 +20,7 @@ function parseHash() {
 
 function route() {
   const { parts, params } = parseHash();
+  if (parts[0] === 'join' && !state.signedIn) return { tab: null, view: joinView(params) };
   if (!state.signedIn) return { tab: null, view: loginView() };
   if (!state.ready) return { tab: null, view: h('main', { class: 'page' }, h('p', { class: 'muted' }, t('app.loading'))) };
   switch (parts[0]) {

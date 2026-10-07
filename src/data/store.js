@@ -6,6 +6,7 @@ import { buildGraph, isKnownMinor } from '../lib/graph.js';
 import { relationship } from '../lib/kinship.js';
 import * as familyEdit from '../lib/family-edit.js';
 import { personsToCSV, relationshipsToCSV, parsePersonsCSV, parseRelationshipsCSV } from '../lib/csv.js';
+import { randomToken, sha256Hex } from '../lib/crypto.js';
 
 let lang = 'en';
 try { lang = localStorage.getItem('ft.lang') === 'ta' ? 'ta' : 'en'; } catch { /* storage blocked: default */ }
@@ -28,6 +29,9 @@ export const state = {
   editRequests: [],
   terms: [],
   missing: new Map(),  // kinship_missing: path -> lookups, seeded from the table, grows locally too
+  invites: [],
+  newInviteLink: null, // the one time an admin can see a just-created invite's raw link
+  join: null,          // onboarding wizard state while redeeming an invite (src/views/join.js)
 };
 
 const listeners = new Set();
@@ -65,7 +69,7 @@ export async function signOut() {
   Object.assign(state, {
     signedIn: false, ready: false, userId: null, familyId: null, meId: null,
     persons: [], relationships: [], members: [], contacts: {}, noWhatsapp: new Set(),
-    announcements: [], editRequests: [], terms: [], missing: new Map(),
+    announcements: [], editRequests: [], terms: [], missing: new Map(), invites: [], newInviteLink: null,
   });
   changed();
 }
@@ -105,7 +109,7 @@ async function loadEverything() {
 /** Re-fetches everything a mutation could have changed. Simple and correct beats clever for a family this size. */
 async function reloadCore() {
   const fid = state.familyId;
-  const [persons, relationships, members, contacts, terms, announcements, editRequests] = await Promise.all([
+  const [persons, relationships, members, contacts, terms, announcements, editRequests, invites] = await Promise.all([
     supabase.from('persons').select('*').eq('family_id', fid).order('created_at'),
     supabase.from('relationships').select('*').eq('family_id', fid),
     supabase.from('members').select('user_id, person_id, role').eq('family_id', fid),
@@ -113,6 +117,7 @@ async function reloadCore() {
     supabase.from('kinship_terms').select('*').eq('family_id', fid),
     supabase.from('announcements').select('*').eq('family_id', fid).order('created_at', { ascending: false }),
     supabase.from('edit_requests').select('*').eq('family_id', fid).order('created_at', { ascending: false }),
+    supabase.from('invites').select('id, person_id, created_by, created_at, expires_at, used_at, used_by').eq('family_id', fid).order('created_at', { ascending: false }),
   ]);
   state.persons = persons.data ?? [];
   state.relationships = relationships.data ?? [];
@@ -122,6 +127,7 @@ async function reloadCore() {
   state.terms = terms.data ?? [];
   state.announcements = announcements.data ?? [];
   state.editRequests = editRequests.data ?? [];
+  state.invites = invites.data ?? [];
   changed();
 }
 
@@ -266,6 +272,82 @@ export async function addAnnouncement(a) {
     .insert({ family_id: state.familyId, created_by: state.userId, status: 'pending_approval', ...a });
   if (error) throw error;
   await reloadCore();
+}
+
+// ─── Admin: invites (§5a). Only the raw token is useful to share — stored as a hash (§3), so it
+// can only ever be shown once, right after creation. ──────────────────────────────────────────
+export function unclaimedPersons() {
+  const claimed = new Set(state.members.map((m) => m.person_id));
+  return state.persons.filter((p) => p.name_known && !claimed.has(p.id)).sort((a, b) => a.full_name.localeCompare(b.full_name));
+}
+
+export async function createInvite(personId) {
+  const token = randomToken();
+  const hash = await sha256Hex(token);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  const { error } = await supabase.from('invites').insert({
+    family_id: state.familyId, token_hash: `\\x${hash}`, person_id: personId || null,
+    created_by: state.userId, expires_at: expiresAt,
+  });
+  if (error) throw error;
+  await reloadCore();
+  state.newInviteLink = `${location.origin}${location.pathname}#/join?token=${token}`;
+  changed();
+}
+
+export function dismissNewInviteLink() {
+  state.newInviteLink = null;
+  changed();
+}
+
+export async function revokeInvite(id) {
+  const { error } = await supabase.from('invites').delete().eq('id', id);
+  if (error) throw error;
+  await reloadCore();
+}
+
+// ─── Onboarding (§5a): a relative redeeming an invite link, before they're a member of anything.
+// Email is verified for real via Supabase's own OTP. Phone is NOT — there's no SMS provider wired
+// up yet (Twilio + India DLT needs Siddique's sign-off on the cost first), so the number typed
+// here is only ever stored, never proven; supabase/migrations/…_invite_redemption.sql leaves
+// person_contacts.phone_verified_at null to keep that gap visible in the data itself. ──────────
+export function startJoin(token) {
+  if (state.join?.token === token) return;
+  state.join = { token, step: 'email', email: '', error: null, busy: false };
+  changed();
+}
+
+export async function joinSendCode(email) {
+  state.join = { ...state.join, busy: true, error: null };
+  changed();
+  const { error } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
+  state.join = { ...state.join, busy: false, email: email.trim(), error: error?.message ?? null, step: error ? 'email' : 'code' };
+  changed();
+}
+
+export async function joinVerifyCode(code) {
+  state.join = { ...state.join, busy: true, error: null };
+  changed();
+  const { error } = await supabase.auth.verifyOtp({ email: state.join.email, token: code.trim(), type: 'email' });
+  state.join = { ...state.join, busy: false, error: error?.message ?? null, step: error ? 'code' : 'details' };
+  changed();
+}
+
+export async function joinFinish({ phone, password }) {
+  state.join = { ...state.join, busy: true, error: null };
+  changed();
+  try {
+    const { error: rpcError } = await supabase.rpc('redeem_invite', { p_token: state.join.token, p_phone: phone || null });
+    if (rpcError) throw rpcError;
+    const { error: pwError } = await supabase.auth.updateUser({ password });
+    if (pwError) throw pwError;
+    state.join = null;
+    await loadEverything();
+    location.hash = '#/';
+  } catch (err) {
+    state.join = { ...state.join, busy: false, error: err.message };
+    changed();
+  }
 }
 
 // ─── Admin: CSV (Excel round trip). Export reflects the live data; import stays local to this

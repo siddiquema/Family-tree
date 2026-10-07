@@ -1,6 +1,9 @@
 import { h, icon, toast } from '../ui/dom.js';
 import { t, formatDate } from '../i18n/index.js';
-import { state, person, reviewEdit, setVerified, signOut, isAdmin, exportFamilyCSV, importFamilyCSV } from '../data/store.js';
+import {
+  state, person, reviewEdit, setVerified, signOut, isAdmin, exportFamilyCSV, importFamilyCSV,
+  unclaimedPersons, createInvite, revokeInvite, dismissNewInviteLink,
+} from '../data/store.js';
 import { displayName } from '../ui/people.js';
 import { downloadText } from '../ui/download.js';
 
@@ -15,6 +18,7 @@ export function adminView() {
       h('h1', {}, t('admin.title')),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { signOut(); location.hash = '#/'; } }, t('admin.signOut'))),
 
+    invitesSection(),
     dataSection(),
 
     h('section', {},
@@ -101,6 +105,76 @@ function dataSection() {
       h('div', { class: 'row' }, importBtn),
       errorsBox,
       h('p', { class: 'small muted' }, t('admin.dataSupabaseNote'))));
+}
+
+/** Full timestamp (not just a date), for invite expiry/use times. */
+function formatWhen(iso) {
+  return new Intl.DateTimeFormat(state.lang === 'ta' ? 'ta-IN' : 'en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+/** Invite creation and management (§5a). Admin only (adminView already gates the page). */
+function invitesSection() {
+  const candidates = unclaimedPersons();
+  const picker = h('select', { id: 'invite-person' },
+    h('option', { value: '' }, t('admin.invitesNewProfile')),
+    candidates.map((p) => h('option', { value: p.id }, p.full_name)));
+  const createBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'button' }, t('admin.invitesCreate'));
+  createBtn.onclick = async () => {
+    createBtn.disabled = true;
+    try {
+      await createInvite(picker.value || null);
+    } catch (err) {
+      toast(err.message ?? t('common.error'));
+    } finally {
+      createBtn.disabled = false;
+    }
+  };
+
+  const pending = state.invites.filter((i) => !i.used_at && new Date(i.expires_at) > new Date());
+  const expired = state.invites.filter((i) => !i.used_at && new Date(i.expires_at) <= new Date());
+  const used = state.invites.filter((i) => i.used_at);
+
+  return h('section', {},
+    h('h2', { class: 'section-title' }, t('admin.invitesTitle')),
+    h('div', { class: 'card' },
+      h('p', { class: 'small muted' }, t('admin.invitesNote')),
+      h('p', { class: 'small muted' }, t('admin.invitesPhoneNote')),
+      state.newInviteLink ? newInviteCard(state.newInviteLink) : null,
+      h('label', { for: 'invite-person' }, t('admin.invitesPerson')),
+      picker,
+      h('div', { class: 'row' }, createBtn)),
+    pending.length ? h('div', { class: 'card' },
+      h('h3', {}, t('admin.invitesPending')),
+      h('ul', { class: 'plain-list' }, pending.map((i) => invitedRow(i)))) : null,
+    expired.length ? h('div', { class: 'card' },
+      h('h3', {}, t('admin.invitesExpired')),
+      h('ul', { class: 'plain-list' }, expired.map((i) => invitedRow(i)))) : null,
+    used.length ? h('div', { class: 'card' },
+      h('h3', {}, t('admin.invitesUsed')),
+      h('ul', { class: 'plain-list' }, used.map((i) => h('li', { class: 'row-between' },
+        h('span', {}, i.person_id ? displayName(person(i.person_id)) : t('admin.invitesNewProfile')),
+        h('span', { class: 'small muted' }, t('admin.invitesUsedAt', { date: formatWhen(i.used_at) })))))) : null);
+}
+
+function newInviteCard(link) {
+  return h('div', { class: 'note' },
+    h('p', { class: 'small' }, t('admin.invitesLinkReady')),
+    h('p', { class: 'mono small', style: 'overflow-wrap:anywhere' }, link),
+    h('div', { class: 'row' },
+      h('a', { class: 'btn btn-primary btn-sm', href: `https://wa.me/?text=${encodeURIComponent(t('admin.invitesShareText', { link }))}`, target: '_blank', rel: 'noopener' }, t('admin.invitesShare')),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
+        try { await navigator.clipboard.writeText(link); toast(t('admin.invitesCopied')); } catch { toast(link); }
+      } }, t('admin.invitesCopy')),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: dismissNewInviteLink }, t('common.cancel'))));
+}
+
+function invitedRow(i) {
+  return h('li', { class: 'row-between' },
+    h('span', {}, i.person_id ? displayName(person(i.person_id)) : t('admin.invitesNewProfile')),
+    h('span', { class: 'row', style: 'justify-content:flex-end' },
+      h('span', { class: 'small muted' }, t('admin.invitesExpiresAt', { date: formatWhen(i.expires_at) })),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
+        onclick: () => revokeInvite(i.id).catch((err) => toast(err.message ?? t('common.error'))) }, t('admin.invitesRevoke'))));
 }
 
 function editCard(r) {
