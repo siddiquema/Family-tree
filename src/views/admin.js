@@ -30,20 +30,7 @@ export function adminView() {
     h('section', {},
       h('h2', { class: 'section-title' }, t('admin.terms')),
       h('p', { class: 'small muted' }, t('admin.termsNote')),
-      h('div', { class: 'card terms' }, state.terms.map((term) => h('div', { class: 'term' },
-        h('code', { class: 'term-path' }, term.path),
-        h('div', { class: 'term-labels' },
-          h('span', {}, term.label_en),
-          h('span', { class: 'muted' }, term.label_ta_formal),
-          term.label_ta_local
-            ? h('span', { class: term.is_verified ? 'term-local is-verified' : 'term-local' },
-              `${term.label_ta_local}${term.label_ta_local_roman ? ` (${term.label_ta_local_roman})` : ''}`)
-            : h('span', { class: 'small muted' }, t('admin.noLocal'))),
-        term.label_ta_local
-          ? h('button', { class: `btn btn-sm ${term.is_verified ? 'btn-ghost' : 'btn-primary'}`, type: 'button',
-            onclick: () => setVerified(term.path, !term.is_verified).catch((err) => toast(err.message ?? t('common.error'))) },
-          term.is_verified ? t('admin.undo') : t('admin.confirm'))
-          : null)))),
+      termsList()),
 
     h('section', {},
       h('h2', { class: 'section-title' }, t('admin.missing')),
@@ -105,6 +92,32 @@ function dataSection() {
       h('div', { class: 'row' }, importBtn),
       errorsBox,
       h('p', { class: 'small muted' }, t('admin.dataSupabaseNote'))));
+}
+
+/** Confirming a term re-fetches everything and rebuilds the whole page (no diffing), which would
+ *  otherwise reset this list's scroll to the top on every click — making whatever was below the
+ *  fold seem to "disappear" and the next tap land on the wrong row. Carry the scroll position
+ *  across that rebuild by reading the outgoing element (still live in the DOM at this point,
+ *  since main.js swaps it in only after this function returns) and restoring it once the new one
+ *  is attached. */
+function termsList() {
+  const previousScroll = document.querySelector('.terms')?.scrollTop ?? 0;
+  const list = h('div', { class: 'card terms' }, state.terms.map((term) => h('div', { class: 'term' },
+    h('code', { class: 'term-path' }, term.path),
+    h('div', { class: 'term-labels' },
+      h('span', {}, term.label_en),
+      h('span', { class: 'muted' }, term.label_ta_formal),
+      term.label_ta_local
+        ? h('span', { class: term.is_verified ? 'term-local is-verified' : 'term-local' },
+          `${term.label_ta_local}${term.label_ta_local_roman ? ` (${term.label_ta_local_roman})` : ''}`)
+        : h('span', { class: 'small muted' }, t('admin.noLocal'))),
+    term.label_ta_local
+      ? h('button', { class: `btn btn-sm ${term.is_verified ? 'btn-ghost' : 'btn-primary'}`, type: 'button',
+        onclick: () => setVerified(term.path, !term.is_verified).catch((err) => toast(err.message ?? t('common.error'))) },
+      term.is_verified ? t('admin.undo') : t('admin.confirm'))
+      : null)));
+  requestAnimationFrame(() => { list.scrollTop = previousScroll; });
+  return list;
 }
 
 /** Full timestamp (not just a date), for invite expiry/use times. */

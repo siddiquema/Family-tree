@@ -114,7 +114,7 @@ async function reloadCore() {
     supabase.from('relationships').select('*').eq('family_id', fid),
     supabase.from('members').select('user_id, person_id, role').eq('family_id', fid),
     supabase.from('person_contacts').select('person_id, phone, phone_hidden, has_whatsapp').eq('family_id', fid),
-    supabase.from('kinship_terms').select('*').eq('family_id', fid),
+    supabase.from('kinship_terms').select('*').eq('family_id', fid).order('path'),
     supabase.from('announcements').select('*').eq('family_id', fid).order('created_at', { ascending: false }),
     supabase.from('edit_requests').select('*').eq('family_id', fid).order('created_at', { ascending: false }),
     supabase.from('invites').select('id, person_id, created_by, created_at, expires_at, used_at, used_by').eq('family_id', fid).order('created_at', { ascending: false }),
