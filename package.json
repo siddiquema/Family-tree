@@ -13,7 +13,8 @@
     "test": "node --test tests/*.test.mjs",
     "db:push": "node --env-file-if-exists=.env scripts/apply-schema.mjs",
     "member:add": "node --env-file-if-exists=.env scripts/create-member.mjs",
-    "gedcom:parse": "node scripts/parse-gedcom.mjs"
+    "gedcom:parse": "node scripts/parse-gedcom.mjs",
+    "gedcom:import": "node --env-file-if-exists=.env scripts/import-gedcom.mjs"
   },
   "devDependencies": {
     "csv-parse": "5.6.0",
