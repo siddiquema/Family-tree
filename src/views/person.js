@@ -86,6 +86,12 @@ function editForm(p, mode) {
       if (v !== (p[key] ?? null)) changes[key] = v;
     }
     if (changes.full_name !== undefined) changes.name_known = !!changes.full_name;
+    const statusRaw = data.get('is_living');
+    if (statusRaw !== null) {
+      const v = statusRaw === '' ? null : statusRaw === 'true';
+      if (v !== (p.is_living ?? null)) changes.is_living = v;
+    }
+    // Entering a death year always implies deceased, even if the status field above wasn't touched.
     if (changes.death_year) changes.is_living = false;
     if (!Object.keys(changes).length) { location.hash = `#/person/${p.id}`; return; }
     const btn = e.target.querySelector('button[type=submit]');
@@ -110,6 +116,12 @@ function editForm(p, mode) {
     mode === 'suggest' ? h('p', { class: 'small muted' }, t('person.suggestNote')) : null,
     field('full_name'), field('known_as'), field('house_name'),
     field('birth_year', 'number'), field('death_year', 'number'),
+    h('label', { for: 'f-is_living' }, t('person.status')),
+    h('select', { id: 'f-is_living', name: 'is_living' },
+      h('option', { value: '', selected: p.is_living == null }, t('person.livingUnknown')),
+      h('option', { value: 'true', selected: p.is_living === true }, t('person.living')),
+      h('option', { value: 'false', selected: p.is_living === false }, t('person.deceased'))),
+    h('p', { class: 'small muted' }, t('person.deceasedYearNote')),
     field('native_place'), field('city'), field('notes'),
     h('div', { class: 'row' },
       h('a', { class: 'btn btn-ghost', href: `#/person/${p.id}` }, t('common.cancel')),

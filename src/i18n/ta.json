@@ -55,6 +55,7 @@
  "person.deceased": "மறைந்தவர்",
  "person.livingUnknown": "தெரியவில்லை",
  "person.status": "நிலை",
+ "person.deceasedYearNote": "ஆண்டு தெரியாவிட்டாலும் \"மறைந்தவர்\" என்பதைத் தேர்ந்தெடுக்கலாம் — ஆண்டை வெறுமையாக விடுங்கள்.",
  "person.phone": "தொலைபேசி",
  "person.edit": "விவரங்களைத் திருத்து",
  "person.suggest": "திருத்தத்தைப் பரிந்துரை",

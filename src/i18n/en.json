@@ -55,6 +55,7 @@
  "person.deceased": "Deceased",
  "person.livingUnknown": "Not known",
  "person.status": "Status",
+ "person.deceasedYearNote": "Choose \"Deceased\" even if you don't know the year — leave the year blank.",
  "person.phone": "Phone",
  "person.edit": "Edit details",
  "person.suggest": "Suggest a correction",
