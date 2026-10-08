@@ -211,6 +211,7 @@
  "admin.securityEnable": "Enable authenticator app",
  "admin.securityScanNote": "Scan this with Google Authenticator, Authy, or similar — or enter the code below by hand.",
  "admin.securityQrAlt": "QR code for your authenticator app",
+ "admin.securityTapEnlarge": "Tap the code to make it bigger — easier to scan from a phone.",
  "admin.securityCodeLabel": "Enter the 6-digit code it shows",
  "admin.securityConfirm": "Confirm",
  "admin.securityEnabledToast": "Authenticator app enabled"

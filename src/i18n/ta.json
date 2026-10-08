@@ -211,6 +211,7 @@
  "admin.securityEnable": "ஆத்தென்டிகேட்டர் செயலியை இயக்கு",
  "admin.securityScanNote": "Google Authenticator, Authy போன்ற செயலியில் இதை ஸ்கேன் செய்யவும் — அல்லது கீழே உள்ள குறியீட்டைக் கையால் உள்ளிடவும்.",
  "admin.securityQrAlt": "உங்கள் ஆத்தென்டிகேட்டர் செயலிக்கான QR குறியீடு",
+ "admin.securityTapEnlarge": "குறியீட்டைத் தொட்டு பெரிதாக்கவும் — தொலைபேசியில் ஸ்கேன் செய்வது எளிதாகும்.",
  "admin.securityCodeLabel": "அது காட்டும் 6 இலக்கக் குறியீட்டை உள்ளிடவும்",
  "admin.securityConfirm": "உறுதிசெய்",
  "admin.securityEnabledToast": "ஆத்தென்டிகேட்டர் செயலி இயக்கப்பட்டது"

@@ -127,6 +127,15 @@ function formatWhen(iso) {
   return new Intl.DateTimeFormat(state.lang === 'ta' ? 'ta-IN' : 'en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
 }
 
+/** A phone usually can't autofocus-scan a QR code shown at thumbnail size on a desktop monitor
+ *  from arm's length — it's an SVG, so blowing it up loses no sharpness. */
+function openQrLightbox(src) {
+  const close = () => backdrop.remove();
+  const backdrop = h('div', { class: 'qr-lightbox', onclick: close },
+    h('img', { src, alt: t('admin.securityQrAlt') }));
+  document.body.append(backdrop);
+}
+
 /** Admin powers (invites, delete, kinship confirm, …) are enforced server-side on an aal2
  *  session (§5a) — the database rejects them under a password-only login regardless of what
  *  this screen shows, so enrollment has to happen before any of those actually work. */
@@ -175,7 +184,9 @@ function enrollForm(factorId, qrSrc, secret) {
   };
   return h('form', { class: 'stack', onsubmit: submit },
     h('p', { class: 'small' }, t('admin.securityScanNote')),
-    h('img', { src: qrSrc, alt: t('admin.securityQrAlt'), width: '180', height: '180' }),
+    h('img', { src: qrSrc, alt: t('admin.securityQrAlt'), width: '180', height: '180', class: 'qr-thumb',
+      onclick: (e) => { e.preventDefault(); openQrLightbox(qrSrc); } }),
+    h('p', { class: 'small muted' }, t('admin.securityTapEnlarge')),
     h('p', { class: 'small mono' }, secret),
     h('label', { for: 'mfa-enroll-code' }, t('admin.securityCodeLabel')),
     h('input', { id: 'mfa-enroll-code', name: 'code', inputmode: 'numeric', autocomplete: 'one-time-code', required: true, autofocus: true }),

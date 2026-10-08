@@ -285,6 +285,14 @@ textarea { resize: vertical; }
 .sheet-item.is-danger { color: var(--danger); }
 .sheet-cancel { justify-content: center; margin-top: 6px; border-top: 1px solid var(--line); font-weight: 600; }
 
+/* Authenticator QR code */
+.qr-thumb { cursor: zoom-in; border-radius: 8px; }
+.qr-lightbox {
+  position: fixed; inset: 0; z-index: 30; background: rgb(0 0 0 / 85%);
+  display: grid; place-items: center; padding: 24px; cursor: zoom-out;
+}
+.qr-lightbox img { width: min(85vw, 85vh, 440px); height: auto; background: #fff; border-radius: 12px; padding: 20px; }
+
 /* Press-and-hold feedback */
 .node.is-editable { cursor: pointer; }
 .node.is-holding rect { stroke: var(--accent); stroke-width: 2.5; }
