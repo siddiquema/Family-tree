@@ -362,10 +362,11 @@ export function unclaimedPersons() {
 export async function createInvite(personId) {
   const token = randomToken();
   const hash = await sha256Hex(token);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  // expires_at is left for the database default (now() + 7 days) so it's computed from the
+  // same clock, and the same instant, as created_at — see the migration's comment for why.
   const { error } = await supabase.from('invites').insert({
     family_id: state.familyId, token_hash: `\\x${hash}`, person_id: personId || null,
-    created_by: state.userId, expires_at: expiresAt,
+    created_by: state.userId,
   });
   if (error) throw error;
   await reloadCore();
