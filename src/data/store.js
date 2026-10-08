@@ -382,7 +382,17 @@ export async function joinSimple({ email, phone, password }) {
   changed();
   try {
     const { error: signUpError } = await supabase.auth.signUp({ email: email.trim(), password });
-    if (signUpError) throw signUpError;
+    if (signUpError) {
+      // Retrying after redeem_invite failed on an earlier attempt: signUp already created this
+      // login then, so it isn't "already registered" to anyone else — it's this same person,
+      // not yet linked to the family (the whole point of the step that failed). Sign into it
+      // instead of treating this as a dead end, same password they just typed.
+      const alreadyExists = /already registered|user_already_exists/i.test(signUpError.message ?? '');
+      if (!alreadyExists) throw signUpError;
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (signInError) throw new Error('This email is already registered, and that password doesn\'t match it. '
+        + 'If you remember trying before, use the password you set then — or ask the admin to reset that login.');
+    }
     const { error: rpcError } = await supabase.rpc('redeem_invite',
       { p_token: state.join.token, p_phone: phone || null, p_email_verified: false });
     if (rpcError) throw rpcError;
