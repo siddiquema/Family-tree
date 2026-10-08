@@ -358,16 +358,45 @@ export async function revokeInvite(id) {
 }
 
 // ─── Onboarding (§5a): a relative redeeming an invite link, before they're a member of anything.
-// Email is verified for real via Supabase's own OTP. Phone is NOT — there's no SMS provider wired
-// up yet (Twilio + India DLT needs Siddique's sign-off on the cost first), so the number typed
-// here is only ever stored, never proven; supabase/migrations/…_invite_redemption.sql leaves
-// person_contacts.phone_verified_at null to keep that gap visible in the data itself. ──────────
+// Phone is not verified — there's no SMS provider wired up yet (Twilio + India DLT needs
+// Siddique's sign-off on the cost first), so the number typed here is only ever stored, never
+// proven; redeem_invite() leaves person_contacts.phone_verified_at null to keep that gap visible
+// in the data itself.
+//
+// TEMPORARY (08 Oct 26): email is not verified either, right now. The real flow — Supabase's own
+// email OTP (joinSendCode/joinVerifyCode below, unused while this is in effect) — hit "email rate
+// limit exceeded" during actual use: Supabase's built-in sender is too rate-limited for real
+// traffic, and a real SMTP provider isn't configured yet (CLAUDE.md §2). Until then, joinSimple()
+// below creates the account directly with supabase.auth.signUp() and passes
+// p_email_verified: false to redeem_invite(), so — like the phone number — the email is recorded
+// but not claimed as proven. Revert: once SMTP is working, switch startJoin's initial step back
+// to 'email' and wire the UI through joinSendCode → joinVerifyCode → joinFinish again. ──────────
 export function startJoin(token) {
   if (state.join?.token === token) return;
-  state.join = { token, step: 'email', email: '', error: null, busy: false };
+  state.join = { token, step: 'details', email: '', error: null, busy: false };
   changed();
 }
 
+export async function joinSimple({ email, phone, password }) {
+  state.join = { ...state.join, busy: true, error: null };
+  changed();
+  try {
+    const { error: signUpError } = await supabase.auth.signUp({ email: email.trim(), password });
+    if (signUpError) throw signUpError;
+    const { error: rpcError } = await supabase.rpc('redeem_invite',
+      { p_token: state.join.token, p_phone: phone || null, p_email_verified: false });
+    if (rpcError) throw rpcError;
+    state.join = null;
+    await loadEverything();
+    location.hash = '#/';
+  } catch (err) {
+    state.join = { ...state.join, busy: false, error: err.message };
+    changed();
+  }
+}
+
+// ─── Unused while joinSimple() is in effect (see the TEMPORARY note above) — kept so switching
+// back once SMTP is configured is a UI change, not a rewrite. ───────────────────────────────────
 export async function joinSendCode(email) {
   state.join = { ...state.join, busy: true, error: null };
   changed();

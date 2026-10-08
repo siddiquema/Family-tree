@@ -199,6 +199,7 @@
  "join.code": "6-digit code",
  "join.verifyCode": "Verify",
  "join.detailsIntro": "Almost done. Add your phone number and set a password.",
+ "join.detailsIntroNoOtp": "Enter your email, add your phone number if you'd like, and set a password to join.",
  "join.phone": "Phone (optional for now)",
  "join.phoneNote": "Not verified by SMS yet — just recorded on your profile for now.",
  "join.phoneInvalid": "Phone must include the country code, e.g. +91XXXXXXXXXX.",

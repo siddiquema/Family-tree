@@ -32,7 +32,8 @@ insert into auth.users (id) values
   ('00000000-0000-0000-0000-0000000000a1'), -- admin
   ('00000000-0000-0000-0000-0000000000b1'), -- new relative, claiming an existing unclaimed person
   ('00000000-0000-0000-0000-0000000000c1'), -- new relative, no person_id on invite (creates a new person)
-  ('00000000-0000-0000-0000-0000000000d1'); -- tries to reuse a used invite
+  ('00000000-0000-0000-0000-0000000000d1'), -- tries to reuse a used invite
+  ('00000000-0000-0000-0000-0000000000e2'); -- joins via signUp (no OTP), p_email_verified = false
 insert into families (id, name) values ('00000000-0000-0000-0000-0000000000f1', 'Family one');
 insert into persons (id, family_id, full_name, gender, birth_year) values
   ('00000000-0000-0000-0000-000000000106', '00000000-0000-0000-0000-0000000000f1', 'Admin person', 'female', 1975),
@@ -45,7 +46,8 @@ select pg_temp.login('00000000-0000-0000-0000-0000000000a1', null, 'aal2');
 insert into invites (id, family_id, token_hash, person_id, created_by, expires_at, created_at) values
   ('00000000-0000-0000-0000-000000000900', '00000000-0000-0000-0000-0000000000f1', sha256(convert_to('tok-claim-existing', 'UTF8')), '00000000-0000-0000-0000-000000000110', '00000000-0000-0000-0000-0000000000a1', now() + interval '7 days', now()),
   ('00000000-0000-0000-0000-000000000901', '00000000-0000-0000-0000-0000000000f1', sha256(convert_to('tok-new-person', 'UTF8')), null, '00000000-0000-0000-0000-0000000000a1', now() + interval '7 days', now()),
-  ('00000000-0000-0000-0000-000000000902', '00000000-0000-0000-0000-0000000000f1', sha256(convert_to('tok-expired', 'UTF8')), null, '00000000-0000-0000-0000-0000000000a1', now() - interval '3 days', now() - interval '10 days');
+  ('00000000-0000-0000-0000-000000000902', '00000000-0000-0000-0000-0000000000f1', sha256(convert_to('tok-expired', 'UTF8')), null, '00000000-0000-0000-0000-0000000000a1', now() - interval '3 days', now() - interval '10 days'),
+  ('00000000-0000-0000-0000-000000000903', '00000000-0000-0000-0000-0000000000f1', sha256(convert_to('tok-no-otp', 'UTF8')), null, '00000000-0000-0000-0000-0000000000a1', now() + interval '7 days', now());
 select pg_temp.logout();
 
 select pg_temp.login('00000000-0000-0000-0000-0000000000b1', 'b@example.com');
@@ -78,7 +80,14 @@ select pg_temp.ok('an invite with no person_id creates a brand new placeholder p
     where m.user_id = '00000000-0000-0000-0000-0000000000c1' and p.name_known = false));
 select pg_temp.logout();
 
+select pg_temp.login('00000000-0000-0000-0000-0000000000e2', 'e@example.com');
+select redeem_invite('tok-no-otp', '+919800000022', false);
+select pg_temp.ok('p_email_verified = false records the email but leaves it unverified (no OTP step happened)',
+  (select email = 'e@example.com' and email_verified_at is null from person_contacts p
+    join members m on m.person_id = p.person_id where m.user_id = '00000000-0000-0000-0000-0000000000e2'));
+select pg_temp.logout();
+
 select pg_temp.login('00000000-0000-0000-0000-0000000000a1', null, 'aal2');
-select pg_temp.ok('the admin can see both invites are now used',
-  (select count(*) = 2 from invites where used_at is not null));
+select pg_temp.ok('the admin can see all three invites are now used',
+  (select count(*) = 3 from invites where used_at is not null));
 select pg_temp.logout();
