@@ -32,6 +32,8 @@ export const state = {
   invites: [],
   newInviteLink: null, // the one time an admin can see a just-created invite's raw link
   join: null,          // onboarding wizard state while redeeming an invite (src/views/join.js)
+  mfaStep: null,        // { factorId } once password is right but an authenticator code is also needed (§5a)
+  mfaEnrolled: false,   // this login has a verified authenticator factor on file
 };
 
 const listeners = new Set();
@@ -60,7 +62,7 @@ export async function signInWithPassword(idOrPhone, password) {
   const { error } = await supabase.auth.signInWithPassword(
     isEmail ? { email: idOrPhone.trim(), password } : { phone: idOrPhone.trim(), password });
   if (error) { state.authError = error.message; changed(); return false; }
-  await loadEverything();
+  await afterPasswordVerified();
   return true;
 }
 
@@ -70,6 +72,7 @@ export async function signOut() {
     signedIn: false, ready: false, userId: null, familyId: null, meId: null,
     persons: [], relationships: [], members: [], contacts: {}, noWhatsapp: new Set(),
     announcements: [], editRequests: [], terms: [], missing: new Map(), invites: [], newInviteLink: null,
+    mfaStep: null, mfaEnrolled: false,
   });
   changed();
 }
@@ -77,8 +80,49 @@ export async function signOut() {
 /** Resumes an existing browser session (page reload) without asking for the password again. */
 export async function resumeSession() {
   const { data: { session } } = await supabase.auth.getSession();
-  if (session) { state.signedIn = true; await loadEverything(); }
+  if (session) await afterPasswordVerified();
   else changed();
+}
+
+/** The password (or a resumed session) checks out, but §5a requires an authenticator-app code
+ *  too for anyone with one enrolled — not just admins at signup, but every sign-in afterward,
+ *  since Supabase computes nextLevel from whatever factors already exist on the account. Until
+ *  that second step finishes, state.signedIn stays false so the login screen keeps showing
+ *  (src/views/login.js renders the code prompt instead of the password form while mfaStep is set). */
+async function afterPasswordVerified() {
+  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+  if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+    const { data: factors } = await supabase.auth.mfa.listFactors();
+    const factorId = factors?.totp?.[0]?.id;
+    if (factorId) { state.mfaStep = { factorId }; changed(); return; }
+  }
+  await loadEverything();
+}
+
+/** Step two of sign-in, only reached when afterPasswordVerified() found a code is required. */
+export async function mfaLoginVerify(code) {
+  if (!state.mfaStep) return false;
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId: state.mfaStep.factorId, code: code.trim() });
+  if (error) { state.authError = error.message; changed(); return false; }
+  state.mfaStep = null;
+  await loadEverything();
+  return true;
+}
+
+// ─── Authenticator-app enrollment (§5a: required for admin powers, optional otherwise) ──────
+export async function mfaEnrollStart() {
+  const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', issuer: 'Family Tree' });
+  if (error) throw error;
+  return data; // { id, totp: { qr_code: <data: URI>, secret, uri } }
+}
+
+/** Verifying during enrollment also elevates the current session straight to aal2 — no separate
+ *  login step needed right after setting this up. */
+export async function mfaEnrollConfirm(factorId, code) {
+  const { error } = await supabase.auth.mfa.challengeAndVerify({ factorId, code: code.trim() });
+  if (error) throw error;
+  state.mfaEnrolled = true;
+  changed();
 }
 
 async function loadEverything() {
@@ -101,6 +145,8 @@ async function loadEverything() {
   await reloadCore();
   const { data: missingRows } = await supabase.from('kinship_missing').select('path, lookups').eq('family_id', state.familyId);
   state.missing = new Map((missingRows ?? []).map((r) => [r.path, r.lookups]));
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  state.mfaEnrolled = (factors?.totp?.length ?? 0) > 0;
 
   state.ready = true;
   changed();

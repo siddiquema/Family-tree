@@ -167,6 +167,10 @@
  "admin.dataMoreErrors": "…and {n} more",
  "admin.dataSupabaseNote": "This only updates the prototype in your browser. To update the real database, use the uploaded files with scripts/import-seed.mjs, or paste them through scripts/seed-to-sql.mjs as before.",
  "login.failed": "Phone/email or password is not right. Try again, or ask a relative to help you reset it.",
+ "login.mfaIntro": "Enter the 6-digit code from your authenticator app.",
+ "login.mfaCode": "Authenticator code",
+ "login.mfaVerify": "Verify",
+ "login.mfaFailed": "That code wasn't right. Try the current one from your app.",
  "app.loading": "Loading your family…",
  "common.error": "Something went wrong. Please try again.",
  "admin.invitesTitle": "Invite a relative",
@@ -200,5 +204,14 @@
  "join.phoneInvalid": "Phone must include the country code, e.g. +91XXXXXXXXXX.",
  "join.password": "Set a password (12+ characters)",
  "join.passwordTooShort": "Password must be at least 12 characters.",
- "join.finish": "Join the family"
+ "join.finish": "Join the family",
+ "admin.securityTitle": "Two-factor sign-in",
+ "admin.securityNote": "Admin actions (invites, deleting people, confirming relationship names…) need an authenticator-app code on top of your password, not just the password alone.",
+ "admin.securityEnabled": "Enabled on this login.",
+ "admin.securityEnable": "Enable authenticator app",
+ "admin.securityScanNote": "Scan this with Google Authenticator, Authy, or similar — or enter the code below by hand.",
+ "admin.securityQrAlt": "QR code for your authenticator app",
+ "admin.securityCodeLabel": "Enter the 6-digit code it shows",
+ "admin.securityConfirm": "Confirm",
+ "admin.securityEnabledToast": "Authenticator app enabled"
 }

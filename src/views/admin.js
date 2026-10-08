@@ -3,6 +3,7 @@ import { t, formatDate } from '../i18n/index.js';
 import {
   state, person, reviewEdit, setVerified, signOut, isAdmin, exportFamilyCSV, importFamilyCSV,
   unclaimedPersons, createInvite, revokeInvite, dismissNewInviteLink,
+  mfaEnrollStart, mfaEnrollConfirm,
 } from '../data/store.js';
 import { displayName } from '../ui/people.js';
 import { downloadText } from '../ui/download.js';
@@ -18,6 +19,7 @@ export function adminView() {
       h('h1', {}, t('admin.title')),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { signOut(); location.hash = '#/'; } }, t('admin.signOut'))),
 
+    securitySection(),
     invitesSection(),
     dataSection(),
 
@@ -123,6 +125,61 @@ function termsList() {
 /** Full timestamp (not just a date), for invite expiry/use times. */
 function formatWhen(iso) {
   return new Intl.DateTimeFormat(state.lang === 'ta' ? 'ta-IN' : 'en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+}
+
+/** Admin powers (invites, delete, kinship confirm, …) are enforced server-side on an aal2
+ *  session (§5a) — the database rejects them under a password-only login regardless of what
+ *  this screen shows, so enrollment has to happen before any of those actually work. */
+function securitySection() {
+  const body = state.mfaEnrolled
+    ? h('p', { class: 'small muted' }, t('admin.securityEnabled'))
+    : enrollBox();
+  return h('section', {},
+    h('h2', { class: 'section-title' }, t('admin.securityTitle')),
+    h('div', { class: 'card' },
+      h('p', { class: 'small muted' }, t('admin.securityNote')),
+      body));
+}
+
+function enrollBox() {
+  const box = h('div', { class: 'stack' });
+  const startBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'button' }, t('admin.securityEnable'));
+  startBtn.onclick = async () => {
+    startBtn.disabled = true;
+    try {
+      const data = await mfaEnrollStart();
+      box.replaceChildren(enrollForm(data.id, data.totp.qr_code, data.totp.secret));
+    } catch (err) {
+      toast(err.message ?? t('common.error'));
+      startBtn.disabled = false;
+    }
+  };
+  box.append(startBtn);
+  return box;
+}
+
+function enrollForm(factorId, qrSrc, secret) {
+  const submit = async (e) => {
+    e.preventDefault();
+    const code = String(new FormData(e.target).get('code') ?? '').trim();
+    if (!code) return;
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    try {
+      await mfaEnrollConfirm(factorId, code);
+      toast(t('admin.securityEnabledToast'));
+    } catch (err) {
+      btn.disabled = false;
+      toast(err.message ?? t('common.error'));
+    }
+  };
+  return h('form', { class: 'stack', onsubmit: submit },
+    h('p', { class: 'small' }, t('admin.securityScanNote')),
+    h('img', { src: qrSrc, alt: t('admin.securityQrAlt'), width: '180', height: '180' }),
+    h('p', { class: 'small mono' }, secret),
+    h('label', { for: 'mfa-enroll-code' }, t('admin.securityCodeLabel')),
+    h('input', { id: 'mfa-enroll-code', name: 'code', inputmode: 'numeric', autocomplete: 'one-time-code', required: true, autofocus: true }),
+    h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, t('admin.securityConfirm')));
 }
 
 /** Invite creation and management (§5a). Admin only (adminView already gates the page). */

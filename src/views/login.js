@@ -1,8 +1,15 @@
 import { h, toast } from '../ui/dom.js';
 import { t } from '../i18n/index.js';
-import { state, signInWithPassword } from '../data/store.js';
+import { state, signInWithPassword, mfaLoginVerify } from '../data/store.js';
 
 export function loginView() {
+  return h('main', { class: 'login' },
+    h('div', { class: 'login-mark', 'aria-hidden': 'true' }, treeMark()),
+    h('h1', { class: 'login-title' }, t('app.name')),
+    state.mfaStep ? mfaStep() : passwordStep());
+}
+
+function passwordStep() {
   const submit = async (e) => {
     e.preventDefault();
     const data = new FormData(e.target);
@@ -15,9 +22,7 @@ export function loginView() {
     btn.disabled = false;
     if (!ok) toast(state.authError ?? t('login.failed'));
   };
-  return h('main', { class: 'login' },
-    h('div', { class: 'login-mark', 'aria-hidden': 'true' }, treeMark()),
-    h('h1', { class: 'login-title' }, t('app.name')),
+  return [
     h('p', { class: 'muted' }, t('login.invite')),
     h('form', { class: 'card form', onsubmit: submit },
       h('label', { for: 'login-id' }, t('login.id')),
@@ -25,7 +30,28 @@ export function loginView() {
       h('label', { for: 'login-password' }, t('login.password')),
       h('input', { id: 'login-password', name: 'password', type: 'password', autocomplete: 'current-password', required: true }),
       h('button', { class: 'btn btn-primary', type: 'submit' }, t('login.submit'))),
-    h('p', { class: 'small muted' }, t('login.forgot')));
+    h('p', { class: 'small muted' }, t('login.forgot')),
+  ];
+}
+
+function mfaStep() {
+  const submit = async (e) => {
+    e.preventDefault();
+    const code = String(new FormData(e.target).get('code') ?? '').trim();
+    if (!code) return;
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    const ok = await mfaLoginVerify(code);
+    btn.disabled = false;
+    if (!ok) toast(state.authError ?? t('login.mfaFailed'));
+  };
+  return [
+    h('p', { class: 'muted' }, t('login.mfaIntro')),
+    h('form', { class: 'card form', onsubmit: submit },
+      h('label', { for: 'login-mfa-code' }, t('login.mfaCode')),
+      h('input', { id: 'login-mfa-code', name: 'code', inputmode: 'numeric', autocomplete: 'one-time-code', autofocus: true, required: true }),
+      h('button', { class: 'btn btn-primary', type: 'submit' }, t('login.mfaVerify'))),
+  ];
 }
 
 function treeMark() {
