@@ -228,18 +228,22 @@ export function contactView(id) {
 
 export function nudges(limit = 4) {
   const g = graph();
+  const ownChildren = new Set(g.childrenOf(state.meId).map((c) => c.id));
   const close = [
     ...g.parentsOf(state.meId).map((p) => p.id),
     ...g.parentsOf(state.meId).flatMap((p) => g.parentsOf(p.id).map((gp) => gp.id)),
     ...g.siblingsOf(state.meId),
-    ...g.childrenOf(state.meId).map((c) => c.id),
+    ...ownChildren,
   ];
   const out = [];
   for (const id of new Set(close)) {
     const p = person(id);
     if (!p.name_known) out.push({ id, kind: 'name' });
     else if (p.birth_year == null) out.push({ id, kind: 'birth' });
-    else if (p.is_living === null) out.push({ id, kind: 'living' });
+    // Never for the viewer's own children — they're never in any real doubt about this, and
+    // asking is jarring regardless (directly asking whether a living relative "is still alive"
+    // reads as rude/inauspicious in Tamil/South Indian usage, not just pointless here).
+    else if (p.is_living === null && !ownChildren.has(id)) out.push({ id, kind: 'living' });
     else if (p.is_living === false && !p.house_name && p.birth_year < 1950) out.push({ id, kind: 'house' });
     else if (!p.city && p.is_living && !isKnownMinor(p)) out.push({ id, kind: 'city' });
   }
@@ -271,8 +275,13 @@ export async function updatePerson(id, changes) {
 
 export async function addFamilyMember(id, kind, parentSubtype = 'biological') {
   if (!canAddRelative(id)) return null;
+  // A new child defaults to living — whoever's adding them is their parent and isn't in any
+  // doubt, so there's no reason for nudges() to later ask (see the note there on why that
+  // question is worth avoiding regardless). Parents/spouses added fresh are left unknown, since
+  // they're more often an older or less-known relative.
   const { data: row, error: insErr } = await supabase.from('persons')
-    .insert({ family_id: state.familyId, name_known: false, created_by: state.userId }).select('id').single();
+    .insert({ family_id: state.familyId, name_known: false, created_by: state.userId, is_living: kind === 'child' ? true : null })
+    .select('id').single();
   if (insErr) throw insErr;
   const newId = row.id;
   const links = kind === 'parent' ? [{ person_a: newId, person_b: id, type: 'parent_of', subtype: parentSubtype }]

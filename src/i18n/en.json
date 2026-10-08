@@ -23,7 +23,7 @@
  "home.openTree": "Open the family tree",
  "nudge.name": "A relative's name is missing",
  "nudge.birth": "Add {name}'s birth year",
- "nudge.living": "Is {name} living? Let the family know",
+ "nudge.living": "Add {name}'s status",
  "nudge.house": "Add {name}'s house name",
  "nudge.city": "Where does {name} live now?",
  "common.you": "You",
