@@ -365,6 +365,18 @@ export async function revokeInvite(id) {
   await reloadCore();
 }
 
+/** Recovers a login stuck mid-join: they have a working Supabase Auth account (signUp()
+ *  succeeded) but redeem_invite() never finished, so there's no members row and they see
+ *  "not linked to a family yet". Normally retrying the invite link finishes the job itself —
+ *  this is the escape hatch for when that's not working, same effect as
+ *  scripts/create-member.mjs, without needing terminal/database access. */
+export async function adminLinkMember(email, personId) {
+  const { error } = await supabase.rpc('admin_link_member',
+    { fid: state.familyId, p_email: email.trim(), p_person_id: personId });
+  if (error) throw error;
+  await reloadCore();
+}
+
 // ─── Onboarding (§5a): a relative redeeming an invite link, before they're a member of anything.
 // Phone is not verified — there's no SMS provider wired up yet (Twilio + India DLT needs
 // Siddique's sign-off on the cost first), so the number typed here is only ever stored, never

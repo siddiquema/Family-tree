@@ -2,7 +2,7 @@ import { h, icon, toast } from '../ui/dom.js';
 import { t, formatDate } from '../i18n/index.js';
 import {
   state, person, reviewEdit, setVerified, signOut, isAdmin, exportFamilyCSV, importFamilyCSV,
-  unclaimedPersons, createInvite, revokeInvite, dismissNewInviteLink,
+  unclaimedPersons, createInvite, revokeInvite, dismissNewInviteLink, adminLinkMember,
   mfaEnrollStart, mfaEnrollConfirm,
 } from '../data/store.js';
 import { displayName } from '../ui/people.js';
@@ -21,6 +21,7 @@ export function adminView() {
 
     securitySection(),
     invitesSection(),
+    stuckLoginsSection(),
     dataSection(),
 
     h('section', {},
@@ -256,6 +257,43 @@ function invitedRow(i) {
       h('span', { class: 'small muted' }, t('admin.invitesExpiresAt', { date: formatWhen(i.expires_at) })),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button',
         onclick: () => revokeInvite(i.id).catch((err) => toast(err.message ?? t('common.error'))) }, t('admin.invitesRevoke'))));
+}
+
+/** Recovers a login stuck mid-join (§5a): their account exists (signUp() succeeded) but
+ *  redeem_invite() never finished — no members row, so they see "not linked to a family yet".
+ *  Normally retrying the invite link finishes the job itself; this is for when that's not
+ *  working, or it's just faster to finish it directly than walk a relative through retrying. */
+function stuckLoginsSection() {
+  const candidates = unclaimedPersons();
+  const email = h('input', { id: 'stuck-email', type: 'email', required: true, placeholder: 'name@example.com' });
+  const picker = h('select', { id: 'stuck-person' },
+    h('option', { value: '' }, t('admin.invitesNewProfile')),
+    candidates.map((p) => h('option', { value: p.id }, p.full_name)));
+  const linkBtn = h('button', { class: 'btn btn-primary btn-sm', type: 'button' }, t('admin.stuckLink'));
+  linkBtn.onclick = async () => {
+    if (!email.value.trim()) { toast(t('admin.stuckEmailRequired')); return; }
+    linkBtn.disabled = true;
+    try {
+      await adminLinkMember(email.value, picker.value || null);
+      toast(t('admin.stuckLinked'));
+      email.value = '';
+      picker.value = '';
+    } catch (err) {
+      toast(err.message ?? t('common.error'));
+    } finally {
+      linkBtn.disabled = false;
+    }
+  };
+
+  return h('section', {},
+    h('h2', { class: 'section-title' }, t('admin.stuckTitle')),
+    h('div', { class: 'card' },
+      h('p', { class: 'small muted' }, t('admin.stuckNote')),
+      h('label', { for: 'stuck-email' }, t('admin.stuckEmail')),
+      email,
+      h('label', { for: 'stuck-person' }, t('admin.invitesPerson')),
+      picker,
+      h('div', { class: 'row' }, linkBtn)));
 }
 
 function editCard(r) {
