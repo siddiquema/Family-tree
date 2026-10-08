@@ -4,7 +4,7 @@
 import { h, s, icon } from '../ui/dom.js';
 import { t } from '../i18n/index.js';
 import { state, graph, person, canEdit } from '../data/store.js';
-import { years } from '../ui/people.js';
+import { displayName, years } from '../ui/people.js';
 import { openPersonMenu } from '../ui/person-menu.js';
 
 const CARD_W = 168;
@@ -23,6 +23,31 @@ function roots() {
     seen.add(p.id);
     return true;
   });
+}
+
+/** Walks up from `id` to whichever ancestor has no recorded parents — the root that `roots()`
+ *  would list for this person's branch. Family trees merged from separate sources (CLAUDE.md §9)
+ *  can have several such roots, one per originally-disconnected branch. */
+function topAncestorOf(id) {
+  const g = graph();
+  let current = id;
+  const seen = new Set();
+  while (!seen.has(current)) {
+    seen.add(current);
+    const parents = g.parentsOf(current);
+    if (!parents.length) return current;
+    current = parents[0].id;
+  }
+  return current; // a cycle would be a data bug the database itself rejects; this just stops
+}
+
+/** Every named person, for the "jump to" search — label disambiguates same-name relatives
+ *  (CLAUDE.md §10: duplicate names are left as-is, not merged) with birth year and house name. */
+function searchable() {
+  return state.persons
+    .filter((p) => p.name_known)
+    .map((p) => ({ id: p.id, label: [displayName(p), [years(p), p.house_name].filter(Boolean).join(' · ')].filter(Boolean).join(' — ') }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function layout(rootId) {
@@ -86,7 +111,8 @@ function card(n) {
 
 export function treeView(params) {
   const options = roots();
-  const rootId = params.get('root') ?? options[0]?.id;
+  const focusId = params.get('focus');
+  const rootId = params.get('root') ?? (focusId ? topAncestorOf(focusId) : options[0]?.id);
   const { nodes, links, width, height } = layout(rootId);
 
   const svg = s('svg', { class: 'tree-svg', role: 'img', 'aria-label': t('tree.title') });
@@ -208,11 +234,20 @@ export function treeView(params) {
     const box = svg.getBoundingClientRect();
     return [box.width / 2, box.height / 2];
   };
+  const jumpTo = h('select', { id: 'tree-jump', 'aria-label': t('tree.jumpTo') },
+    h('option', { value: '', selected: true }, t('tree.jumpToPlaceholder')),
+    searchable().map((p) => h('option', { value: p.id }, p.label)));
+  jumpTo.onchange = () => {
+    if (!jumpTo.value) return;
+    location.hash = `#/tree?root=${topAncestorOf(jumpTo.value)}&focus=${jumpTo.value}`;
+  };
+
   const view = h('main', { class: 'tree-page' },
     h('div', { class: 'tree-toolbar' },
       options.length > 1 ? h('select', { id: 'tree-root', 'aria-label': t('tree.startFrom'),
         onchange: (e) => { location.hash = `#/tree?root=${e.target.value}`; } },
       options.map((p) => h('option', { value: p.id, selected: p.id === rootId }, p.full_name))) : null,
+      jumpTo,
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('tree.zoomOut'), onclick: () => zoomAt(0.8, ...centre()) }, icon('minus')),
       h('button', { class: 'icon-btn', type: 'button', 'aria-label': t('tree.zoomIn'), onclick: () => zoomAt(1.25, ...centre()) }, icon('plus')),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => centreOn(state.meId) }, icon('target', 18), t('tree.findMe'))),
@@ -220,7 +255,11 @@ export function treeView(params) {
     h('p', { class: 'tree-hint small muted' }, t('tree.hint')),
     h('p', { class: 'tree-hint small muted' }, t('tree.holdHint')));
 
-  requestAnimationFrame(() => (nodes.some((n) => n.id === state.meId) ? centreOn(state.meId) : centreOn(rootId)));
+  requestAnimationFrame(() => {
+    if (focusId && nodes.some((n) => n.id === focusId)) centreOn(focusId);
+    else if (nodes.some((n) => n.id === state.meId)) centreOn(state.meId);
+    else centreOn(rootId);
+  });
   view.dataset.size = `${Math.round(width)}x${Math.round(height)}`;
   return view;
 }

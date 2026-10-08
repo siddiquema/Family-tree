@@ -34,6 +34,8 @@
  "common.view": "View",
  "tree.title": "Family tree",
  "tree.startFrom": "Start from",
+ "tree.jumpTo": "Jump to someone",
+ "tree.jumpToPlaceholder": "Jump to…",
  "tree.findMe": "Find me",
  "tree.zoomIn": "Zoom in",
  "tree.zoomOut": "Zoom out",

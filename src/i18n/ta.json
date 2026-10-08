@@ -34,6 +34,8 @@
  "common.view": "பார்க்க",
  "tree.title": "குடும்ப மரம்",
  "tree.startFrom": "இவரிடமிருந்து தொடங்கு",
+ "tree.jumpTo": "ஒருவரிடம் செல்",
+ "tree.jumpToPlaceholder": "செல்ல…",
  "tree.findMe": "என்னைக் காட்டு",
  "tree.zoomIn": "பெரிதாக்கு",
  "tree.zoomOut": "சிறிதாக்கு",
