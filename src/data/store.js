@@ -67,7 +67,11 @@ export async function signInWithPassword(idOrPhone, password) {
     isEmail ? { email: idOrPhone.trim(), password } : { phone: idOrPhone.trim(), password });
   if (error) { state.authError = error.message; changed(); return false; }
   await afterPasswordVerified();
-  return true;
+  // The password was right, but afterPasswordVerified()/loadEverything() can still fail (e.g.
+  // this login has no members row yet) and set state.authError without ever returning false —
+  // report that as a failure too, so login.js's toast actually fires instead of silently
+  // re-showing the password form with no explanation.
+  return state.signedIn || !!state.mfaStep;
 }
 
 export async function signOut() {
