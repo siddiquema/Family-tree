@@ -4,19 +4,21 @@
 // that's expected, not a bug; it means the schema is already there.
 //
 //   DATABASE_URL=postgres://...  node scripts/apply-schema.mjs
+// Or, to avoid URL-encoding a password with special characters: set PGHOST/PGPORT/PGUSER/
+// PGPASSWORD/PGDATABASE instead — pg reads those itself when no connectionString is given.
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import pg from 'pg';
 
 const dir = 'supabase/migrations';
-const { DATABASE_URL } = process.env;
-if (!DATABASE_URL) {
-  console.error('Set DATABASE_URL (Supabase → Project Settings → Database → Connect → Session pooler).');
+const { DATABASE_URL, PGHOST, PGPASSWORD } = process.env;
+if (!DATABASE_URL && !(PGHOST && PGPASSWORD)) {
+  console.error('Set DATABASE_URL, or PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE (Supabase → Project Settings → Database → Connect → Session pooler).');
   process.exit(1);
 }
 
 const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
-const client = new pg.Client({ connectionString: DATABASE_URL });
+const client = new pg.Client(DATABASE_URL ? { connectionString: DATABASE_URL } : {});
 await client.connect();
 try {
   for (const file of files) {

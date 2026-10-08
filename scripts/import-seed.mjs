@@ -14,9 +14,11 @@ import pg from 'pg';
 
 const SYSTEM = 'seed_xlsx_2011';
 const seedDir = process.argv[2] ?? 'seed';
-const { DATABASE_URL, FAMILY_NAME } = process.env;
-if (!DATABASE_URL || !FAMILY_NAME) {
-  console.error('Set DATABASE_URL and FAMILY_NAME.');
+// Accepts a single DATABASE_URL, or PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE separately — the
+// latter sidesteps URL-encoding a password that happens to contain @, /, #, % or similar.
+const { DATABASE_URL, FAMILY_NAME, PGHOST, PGPASSWORD } = process.env;
+if (!FAMILY_NAME || !(DATABASE_URL || (PGHOST && PGPASSWORD))) {
+  console.error('Set DATABASE_URL (or PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE) and FAMILY_NAME.');
   process.exit(1);
 }
 
@@ -28,7 +30,7 @@ const blank = (v) => (v === undefined || v.trim() === '' ? null : v.trim());
 const int = (v) => (blank(v) === null ? null : Number.parseInt(v, 10));
 const GENDER = { M: 'male', F: 'female' };
 
-const client = new pg.Client({ connectionString: DATABASE_URL });
+const client = new pg.Client(DATABASE_URL ? { connectionString: DATABASE_URL } : {});
 await client.connect();
 try {
   await client.query('begin');
