@@ -273,6 +273,16 @@ export async function updatePerson(id, changes) {
   await reloadCore();
 }
 
+// Direct updates to person_contacts.phone are blocked (no column grant — a verified phone
+// can only change with OTP on the old and new number, per §5a, but phone OTP isn't built
+// yet). This RPC is the deliberate bypass: it always leaves phone_verified_at null.
+export async function setMyPhone(phone, hidden) {
+  const { error } = await supabase.rpc('set_my_phone',
+    { fid: state.familyId, p_phone: phone, p_hidden: !!hidden });
+  if (error) throw error;
+  await reloadCore();
+}
+
 export async function addFamilyMember(id, kind, parentSubtype = 'biological') {
   if (!canAddRelative(id)) return null;
   // A new child defaults to living — whoever's adding them is their parent and isn't in any

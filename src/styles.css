@@ -123,6 +123,8 @@ a { color: inherit; }
 .form label { font-size: .85rem; font-weight: 500; color: var(--muted); margin-top: 6px; }
 .form h2 { margin-bottom: 4px; }
 .form .row { margin-top: 12px; }
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--fg); margin-top: 10px; }
+.checkbox-row input { width: auto; }
 .stack { display: grid; gap: 6px; }
 input, select, textarea {
   font: inherit; width: 100%; min-height: 44px; padding: 8px 12px; border-radius: 10px;

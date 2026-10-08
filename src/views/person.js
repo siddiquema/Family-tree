@@ -1,9 +1,10 @@
 import { h, toast } from '../ui/dom.js';
 import { t } from '../i18n/index.js';
-import { state, person, graph, relationTo, canEdit, contactView, updatePerson, suggestEdit } from '../data/store.js';
+import { state, person, graph, relationTo, canEdit, contactView, updatePerson, suggestEdit, setMyPhone } from '../data/store.js';
 import { isKnownMinor } from '../lib/graph.js';
 import { displayName, years, avatar, personChip } from '../ui/people.js';
 import { relLabel, relLabelOther } from './relation.js';
+import { openPersonMenu } from '../ui/person-menu.js';
 
 const EDITABLE = ['full_name', 'known_as', 'house_name', 'birth_year', 'death_year', 'native_place', 'city', 'notes'];
 
@@ -54,7 +55,17 @@ export function personView(id, params) {
     editing ? editForm(p, mode) : h('div', { class: 'actions' },
       h('a', { class: `btn ${mode === 'edit' ? 'btn-primary' : 'btn-ghost'}`, href: `#/person/${id}?edit=1` },
         t(mode === 'edit' ? 'person.edit' : 'person.suggest')),
+      canEdit(id) ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => openPersonMenu(id) }, t('person.addFamily')) : null,
       mode === 'suggest' && isKnownMinor(p) ? h('p', { class: 'small muted' }, t('person.minorNote')) : null));
+}
+
+function phoneFields(c) {
+  return h('div', {},
+    h('label', { for: 'f-phone' }, t('person.phone')),
+    h('input', { id: 'f-phone', name: 'phone', type: 'tel', value: c.phone ?? '', placeholder: '+91XXXXXXXXXX' }),
+    h('p', { class: 'small muted' }, t('join.phoneInvalid')),
+    h('label', { class: 'checkbox-row' },
+      h('input', { type: 'checkbox', name: 'phone_hidden', checked: !!c.hidden }), t('phone.selfHidden')));
 }
 
 function phoneBlock(id) {
@@ -75,6 +86,8 @@ function phoneBlock(id) {
 }
 
 function editForm(p, mode) {
+  const isSelf = mode === 'edit' && p.id === state.meId;
+  const c = isSelf ? contactView(p.id) : null;
   const submit = async (e) => {
     e.preventDefault();
     const data = new FormData(e.target);
@@ -93,12 +106,21 @@ function editForm(p, mode) {
     }
     // Entering a death year always implies deceased, even if the status field above wasn't touched.
     if (changes.death_year) changes.is_living = false;
-    if (!Object.keys(changes).length) { location.hash = `#/person/${p.id}`; return; }
+    const phoneChange = isSelf && data.has('phone')
+      ? { phone: String(data.get('phone')).trim(), hidden: data.get('phone_hidden') === 'on' }
+      : null;
+    if (!Object.keys(changes).length && !phoneChange) { location.hash = `#/person/${p.id}`; return; }
     const btn = e.target.querySelector('button[type=submit]');
     btn.disabled = true;
     try {
-      if (mode === 'edit') { await updatePerson(p.id, changes); toast(t('person.saved')); }
-      else { await suggestEdit(p.id, changes); toast(t('person.sent')); }
+      if (Object.keys(changes).length) {
+        if (mode === 'edit') await updatePerson(p.id, changes);
+        else await suggestEdit(p.id, changes);
+      }
+      if (phoneChange && (phoneChange.phone !== (c.phone ?? '') || phoneChange.hidden !== !!c.hidden)) {
+        await setMyPhone(phoneChange.phone, phoneChange.hidden);
+      }
+      toast(t(mode === 'edit' ? 'person.saved' : 'person.sent'));
       location.hash = `#/person/${p.id}`;
     } catch (err) {
       btn.disabled = false;
@@ -123,6 +145,7 @@ function editForm(p, mode) {
       h('option', { value: 'false', selected: p.is_living === false }, t('person.deceased'))),
     h('p', { class: 'small muted' }, t('person.deceasedYearNote')),
     field('native_place'), field('city'), field('notes'),
+    isSelf ? phoneFields(c) : null,
     h('div', { class: 'row' },
       h('a', { class: 'btn btn-ghost', href: `#/person/${p.id}` }, t('common.cancel')),
       h('button', { class: 'btn btn-primary', type: 'submit' }, t(mode === 'edit' ? 'common.save' : 'person.suggest'))));

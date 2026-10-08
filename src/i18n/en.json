@@ -57,6 +57,7 @@
  "person.status": "Status",
  "person.deceasedYearNote": "Choose \"Deceased\" even if you don't know the year — leave the year blank.",
  "person.phone": "Phone",
+ "person.addFamily": "Add a parent, child or spouse",
  "person.edit": "Edit details",
  "person.suggest": "Suggest a correction",
  "person.minorNote": "Only parents and admins can change a child's details.",
