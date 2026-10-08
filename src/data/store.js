@@ -55,7 +55,11 @@ export function setLang(value) {
 }
 
 // ─── Auth and loading ────────────────────────────────────────────────────────
-/** Email or phone, whichever the member signed up with (§5a). */
+/** Email or phone, whichever the member signed up with (§5a) — in practice only email right
+ *  now: nobody has a phone-based Supabase Auth identity yet (that needs the SMS/Twilio setup
+ *  still deferred), so login.js only offers an email field. Left accepting either here so
+ *  signing in with a phone starts working the moment phone accounts exist, with no store.js
+ *  change needed. */
 export async function signInWithPassword(idOrPhone, password) {
   state.authError = null;
   const isEmail = idOrPhone.includes('@');

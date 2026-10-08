@@ -26,7 +26,7 @@ function passwordStep() {
     h('p', { class: 'muted' }, t('login.invite')),
     h('form', { class: 'card form', onsubmit: submit },
       h('label', { for: 'login-id' }, t('login.id')),
-      h('input', { id: 'login-id', name: 'id', autocomplete: 'username', inputmode: 'email', required: true, placeholder: '+91 … / name@example.com' }),
+      h('input', { id: 'login-id', name: 'id', type: 'email', autocomplete: 'username', inputmode: 'email', required: true, placeholder: 'name@example.com' }),
       h('label', { for: 'login-password' }, t('login.password')),
       h('input', { id: 'login-password', name: 'password', type: 'password', autocomplete: 'current-password', required: true }),
       h('button', { class: 'btn btn-primary', type: 'submit' }, t('login.submit'))),
