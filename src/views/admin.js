@@ -1,9 +1,10 @@
 import { h, icon, toast } from '../ui/dom.js';
+import { openActionSheet } from '../ui/actionsheet.js';
 import { t, formatDate } from '../i18n/index.js';
 import {
   state, person, reviewEdit, setVerified, signOut, isAdmin, exportFamilyCSV, importFamilyCSV,
   unclaimedPersons, createInvite, revokeInvite, dismissNewInviteLink, adminLinkMember,
-  mfaEnrollStart, mfaEnrollConfirm,
+  mfaEnrollStart, mfaEnrollConfirm, adminResetPassword, dismissPasswordReset,
 } from '../data/store.js';
 import { displayName } from '../ui/people.js';
 import { downloadText } from '../ui/download.js';
@@ -41,11 +42,49 @@ export function adminView() {
         ? h('ul', { class: 'card plain-list' }, missing.map(([path, n]) => h('li', {}, h('code', {}, path), ' ', h('span', { class: 'small muted' }, t('admin.lookups', { n })))))
         : h('p', { class: 'small muted' }, t('admin.missingNone'))),
 
-    h('section', {},
-      h('h2', { class: 'section-title' }, t('admin.members')),
-      h('ul', { class: 'card plain-list' }, state.members.map((m) => h('li', { class: 'row-between' },
-        h('a', { href: `#/person/${m.person_id}` }, displayName(person(m.person_id))),
-        h('span', { class: 'small muted' }, t(`role.${m.role}`)))))));
+    membersSection());
+}
+
+/** Member list, plus the temporary admin-set-password tool (§5a note in the migration): the
+ *  real recovery flow needs a second, different admin to approve, which doesn't exist while
+ *  Siddique is the only admin. */
+function membersSection() {
+  return h('section', {},
+    h('h2', { class: 'section-title' }, t('admin.members')),
+    state.passwordReset ? resetResultCard(state.passwordReset) : null,
+    h('ul', { class: 'card plain-list' }, state.members.map((m) => {
+      const name = displayName(person(m.person_id));
+      const run = async () => {
+        btn.disabled = true;
+        try { await adminResetPassword(m.user_id, name); }
+        catch (err) { toast(err.message ?? t('common.error')); }
+        finally { btn.disabled = false; }
+      };
+      const btn = h('button', { class: 'btn btn-ghost btn-sm', type: 'button' }, t('admin.resetPassword'));
+      btn.onclick = () => openActionSheet({
+        title: t('admin.resetPasswordConfirmTitle', { name }),
+        subtitle: t('admin.resetPasswordConfirm'),
+        items: [{ icon: 'edit', label: t('admin.resetPassword'), danger: true, onSelect: run }],
+        cancelLabel: t('common.cancel'),
+      });
+      return h('li', { class: 'row-between' },
+        h('a', { href: `#/person/${m.person_id}` }, name),
+        h('span', { class: 'row', style: 'justify-content:flex-end' },
+          h('span', { class: 'small muted' }, t(`role.${m.role}`)),
+          btn));
+    })));
+}
+
+function resetResultCard(r) {
+  return h('div', { class: 'note' },
+    h('p', { class: 'small' }, t('admin.resetPasswordReady', { name: r.name })),
+    h('p', { class: 'mono small', style: 'overflow-wrap:anywhere' }, r.password),
+    h('p', { class: 'small muted' }, t('admin.resetPasswordNote')),
+    h('div', { class: 'row' },
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: async () => {
+        try { await navigator.clipboard.writeText(r.password); toast(t('admin.invitesCopied')); } catch { toast(r.password); }
+      } }, t('admin.invitesCopy')),
+      h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: dismissPasswordReset }, t('common.cancel'))));
 }
 
 /** Family-data export (CSV, for Excel) and import. Admin only (adminView already gates the page). */

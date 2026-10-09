@@ -31,6 +31,7 @@ export const state = {
   missing: new Map(),  // kinship_missing: path -> lookups, seeded from the table, grows locally too
   invites: [],
   newInviteLink: null, // the one time an admin can see a just-created invite's raw link
+  passwordReset: null, // the one time an admin can see a just-set temporary password
   join: null,          // onboarding wizard state while redeeming an invite (src/views/join.js)
   mfaStep: null,        // { factorId } once password is right but an authenticator code is also needed (§5a)
   mfaEnrolled: false,   // this login has a verified authenticator factor on file
@@ -80,7 +81,7 @@ export async function signOut() {
     signedIn: false, ready: false, userId: null, familyId: null, meId: null,
     persons: [], relationships: [], members: [], contacts: {}, noWhatsapp: new Set(),
     announcements: [], editRequests: [], terms: [], missing: new Map(), invites: [], newInviteLink: null,
-    mfaStep: null, mfaEnrolled: false,
+    passwordReset: null, mfaStep: null, mfaEnrolled: false,
   });
   changed();
 }
@@ -395,6 +396,22 @@ export async function adminLinkMember(email, personId) {
     { fid: state.familyId, p_email: email.trim(), p_person_id: personId });
   if (error) throw error;
   await reloadCore();
+}
+
+// Temporary bypass of the full §5a recovery flow (needs a second, different admin to approve,
+// which doesn't exist while there's only one admin in the family) — see the migration's comment.
+export async function adminResetPassword(userId, personName) {
+  const newPassword = randomToken(9); // 18 hex chars — well past the 12-char minimum
+  const { error } = await supabase.rpc('admin_reset_password',
+    { fid: state.familyId, target_user_id: userId, new_password: newPassword });
+  if (error) throw error;
+  state.passwordReset = { name: personName, password: newPassword };
+  changed();
+}
+
+export function dismissPasswordReset() {
+  state.passwordReset = null;
+  changed();
 }
 
 // ─── Onboarding (§5a): a relative redeeming an invite link, before they're a member of anything.

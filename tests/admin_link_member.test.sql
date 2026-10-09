@@ -43,6 +43,9 @@ insert into persons (id, family_id, full_name, gender) values
 insert into members (family_id, user_id, person_id, role) values
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-000000000106', 'admin'),
   ('00000000-0000-0000-0000-0000000000f1', '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-000000000107', 'member');
+insert into invites (family_id, token_hash, person_id, created_by, expires_at) values
+  ('00000000-0000-0000-0000-0000000000f1', decode(repeat('ab', 32), 'hex'), '00000000-0000-0000-0000-000000000108',
+   '00000000-0000-0000-0000-0000000000a1', now() + interval '7 days');
 
 select pg_temp.login('00000000-0000-0000-0000-0000000000b1');
 select pg_temp.expect_fail('a non-admin cannot link anyone',
@@ -74,6 +77,9 @@ select admin_link_member('00000000-0000-0000-0000-0000000000f1', 'STUCK@EXAMPLE.
 select pg_temp.ok('the stuck login is now a member, matched case-insensitively, linked to the right person',
   (select person_id = '00000000-0000-0000-0000-000000000108' and role = 'member' from members
     where family_id = '00000000-0000-0000-0000-0000000000f1' and user_id = '00000000-0000-0000-0000-0000000000c1'));
+select pg_temp.ok('their original pending invite was closed out, not left dangling',
+  (select used_at is not null and used_by = '00000000-0000-0000-0000-0000000000c1' from invites
+    where person_id = '00000000-0000-0000-0000-000000000108'));
 select pg_temp.expect_fail('cannot link the same login twice',
   $$select admin_link_member('00000000-0000-0000-0000-0000000000f1', 'stuck@example.com', '00000000-0000-0000-0000-000000000109')$$,
   'already a member');

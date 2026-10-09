@@ -1,7 +1,10 @@
 -- Local stand-in for the parts of Supabase the migrations depend on.
 -- Used only by tests/run.sh against a plain PostgreSQL; never applied to a real Supabase project.
 create schema if not exists auth;
-create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text);
+create table if not exists auth.users (id uuid primary key default gen_random_uuid(), email text,
+  encrypted_password text, updated_at timestamptz);
+create table if not exists auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null);
+create extension if not exists pgcrypto schema public;
 
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon')          then create role anon nologin; end if;
