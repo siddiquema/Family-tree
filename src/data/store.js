@@ -41,6 +41,20 @@ const listeners = new Set();
 export const subscribe = (fn) => listeners.add(fn);
 const changed = () => { cachedGraph = null; listeners.forEach((fn) => fn()); };
 
+// An UPDATE/DELETE blocked by RLS matches zero rows rather than erroring — PostgREST returns
+// success with an empty result, so without checking that, a write silently does nothing (this
+// is what made an admin's own edits vanish without any error whenever their session had quietly
+// dropped back to aal1 — see the MFA/aal2 notes elsewhere in this file). Always .select() the
+// write and check a row actually came back.
+async function mustAffectRow(query, message) {
+  const { data, error } = await query.select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error(message ?? 'Nothing was saved. Your admin sign-in may have expired — try signing out and back in, confirming the authenticator code again.');
+  }
+  return data;
+}
+
 let cachedGraph = null;
 export const graph = () => (cachedGraph ??= buildGraph(state.persons, state.relationships));
 export const person = (id) => graph().byId.get(id);
@@ -269,8 +283,7 @@ export function recipients(audience, anchorId) {
 
 // ─── Writes: each persists to Supabase, then reloads the shared tables ──────
 export async function updatePerson(id, changes) {
-  const { error } = await supabase.from('persons').update(changes).eq('id', id);
-  if (error) throw error;
+  await mustAffectRow(supabase.from('persons').update(changes).eq('id', id));
   await reloadCore();
 }
 
@@ -311,8 +324,7 @@ export async function addFamilyMember(id, kind, parentSubtype = 'biological') {
 
 export async function deletePerson(id) {
   if (!canDelete(id)) return false;
-  const { error } = await supabase.from('persons').delete().eq('id', id);
-  if (error) throw error;
+  await mustAffectRow(supabase.from('persons').delete().eq('id', id));
   await reloadCore();
   return true;
 }
@@ -327,10 +339,9 @@ export async function suggestEdit(id, changes) {
 export async function reviewEdit(requestId, approve) {
   const req = state.editRequests.find((r) => r.id === requestId);
   if (!req || req.submitted_by === state.userId) return;
-  const { error } = await supabase.from('edit_requests')
+  await mustAffectRow(supabase.from('edit_requests')
     .update({ status: approve ? 'approved' : 'rejected', reviewed_by: state.userId, reviewed_at: new Date().toISOString() })
-    .eq('id', requestId);
-  if (error) throw error;
+    .eq('id', requestId));
   if (approve) await updatePerson(req.target_person_id, req.proposed_changes);
   else await reloadCore();
 }
@@ -338,8 +349,7 @@ export async function reviewEdit(requestId, approve) {
 export async function setVerified(path, verified) {
   const t = state.terms.find((x) => x.path === path);
   if (!t || !t.label_ta_local) return;
-  const { error } = await supabase.from('kinship_terms').update({ is_verified: verified }).eq('id', t.id);
-  if (error) throw error;
+  await mustAffectRow(supabase.from('kinship_terms').update({ is_verified: verified }).eq('id', t.id));
   await reloadCore();
 }
 
@@ -381,8 +391,7 @@ export function dismissNewInviteLink() {
 }
 
 export async function revokeInvite(id) {
-  const { error } = await supabase.from('invites').delete().eq('id', id);
-  if (error) throw error;
+  await mustAffectRow(supabase.from('invites').delete().eq('id', id));
   await reloadCore();
 }
 
