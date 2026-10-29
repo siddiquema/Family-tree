@@ -1,0 +1,2 @@
+# Appended to by .github/workflows/supabase-keepalive.yml on every successful run.
+# Keeps the repo active so GitHub doesn't disable the schedule after 60 quiet days.
