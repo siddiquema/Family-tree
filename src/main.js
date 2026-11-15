@@ -39,7 +39,9 @@ function render() {
   const tabs = [['home', '#/'], ['tree', '#/tree'], ['relation', '#/relation'], ['news', '#/news'], ...(isAdmin() ? [['admin', '#/admin']] : [])];
   const scroll = view.classList.contains('tree-page') ? 0 : window.scrollY;
 
-  root.replaceChildren(
+  // replaceChildren() stringifies any non-Node argument — a bare `null` for "no nav yet" was
+  // rendering as a literal "null" text node on screen; filter falsy children out instead.
+  root.replaceChildren(...[
     h('header', { class: 'topbar' },
       parseHash().parts[0] === 'person'
         ? h('button', { class: 'icon-btn', type: 'button', 'aria-label': 'Back', onclick: () => history.back() }, icon('back'))
@@ -48,7 +50,8 @@ function render() {
     view,
     state.ready ? h('nav', { class: 'tabbar', 'aria-label': t('app.name') },
       tabs.map(([name, href]) => h('a', { href, class: name === tab ? 'is-active' : '', 'aria-current': name === tab ? 'page' : null },
-        icon(name), h('span', {}, t(`nav.${name}`))))) : null);
+        icon(name), h('span', {}, t(`nav.${name}`))))) : null,
+  ].filter(Boolean));
   window.scrollTo(0, scroll);
 }
 

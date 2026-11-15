@@ -111,15 +111,28 @@ export async function resumeSession() {
  *  too for anyone with one enrolled — not just admins at signup, but every sign-in afterward,
  *  since Supabase computes nextLevel from whatever factors already exist on the account. Until
  *  that second step finishes, state.signedIn stays false so the login screen keeps showing
- *  (src/views/login.js renders the code prompt instead of the password form while mfaStep is set). */
+ *  (src/views/login.js renders the code prompt instead of the password form while mfaStep is set).
+ *
+ *  Caught here, not left to each caller: a locally-cached session can outlive the server-side
+ *  one (expired token, or every session for this login was revoked — e.g. by
+ *  admin_reset_password), which throws deep inside loadEverything(). Uncaught, that left
+ *  state.ready false forever with no error shown — an infinite "Loading your family…" and no
+ *  way back to the login screen short of clearing site data by hand. */
 async function afterPasswordVerified() {
-  const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
-    const { data: factors } = await supabase.auth.mfa.listFactors();
-    const factorId = factors?.totp?.[0]?.id;
-    if (factorId) { state.mfaStep = { factorId }; changed(); return; }
+  try {
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === 'aal2' && aal.currentLevel !== 'aal2') {
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const factorId = factors?.totp?.[0]?.id;
+      if (factorId) { state.mfaStep = { factorId }; changed(); return; }
+    }
+    await loadEverything();
+  } catch {
+    await supabase.auth.signOut();
+    Object.assign(state, { signedIn: false, ready: false, mfaStep: null });
+    state.authError = 'Your session expired. Please sign in again.';
+    changed();
   }
-  await loadEverything();
 }
 
 /** Step two of sign-in, only reached when afterPasswordVerified() found a code is required. */
@@ -151,6 +164,7 @@ export async function mfaEnrollConfirm(factorId, code) {
 async function loadEverything() {
   state.signedIn = true;
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No valid session');
   state.userId = user.id;
 
   const { data: mine, error: meErr } = await supabase.from('members')

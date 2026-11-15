@@ -24,6 +24,7 @@ function passwordStep() {
   };
   return [
     h('p', { class: 'muted' }, t('login.invite')),
+    state.authError ? h('p', { class: 'small error' }, state.authError) : null,
     h('form', { class: 'card form', onsubmit: submit },
       h('label', { for: 'login-id' }, t('login.id')),
       h('input', { id: 'login-id', name: 'id', type: 'email', autocomplete: 'username', inputmode: 'email', required: true, placeholder: 'name@example.com' }),
