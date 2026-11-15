@@ -33,7 +33,23 @@ function route() {
   }
 }
 
+/** A bug in any one view (a bad date, a missing field) used to crash this whole function —
+ *  since it runs synchronously inside the data-loading chain, that left the page frozen on
+ *  whatever it showed before (usually "Loading your family…") with no visible error at all,
+ *  recoverable only by digging through the browser console. Catch it here once instead, so a
+ *  future bug like that is at least visible and recoverable with a reload. */
 function render() {
+  try {
+    renderUnsafe();
+  } catch (err) {
+    console.error(err);
+    root.replaceChildren(h('main', { class: 'page' },
+      h('p', { class: 'card muted' }, 'Something went wrong showing this page.'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => location.reload() }, 'Reload')));
+  }
+}
+
+function renderUnsafe() {
   document.documentElement.lang = state.lang;
   const { tab, view } = route();
   const tabs = [['home', '#/'], ['tree', '#/tree'], ['relation', '#/relation'], ['news', '#/news'], ...(isAdmin() ? [['admin', '#/admin']] : [])];

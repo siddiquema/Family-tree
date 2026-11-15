@@ -162,9 +162,14 @@ function termsList() {
   return list;
 }
 
-/** Full timestamp (not just a date), for invite expiry/use times. */
+/** Full timestamp (not just a date), for invite expiry/use times. Intl.DateTimeFormat throws
+ *  RangeError: Invalid time value on a bad date, rather than printing something — that crashed
+ *  this whole screen (and left the page frozen on "Loading your family…", since the render
+ *  that was meant to replace it never finished) the one time an invite row's date didn't parse. */
 function formatWhen(iso) {
-  return new Intl.DateTimeFormat(state.lang === 'ta' ? 'ta-IN' : 'en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return new Intl.DateTimeFormat(state.lang === 'ta' ? 'ta-IN' : 'en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }).format(d);
 }
 
 /** A phone usually can't autofocus-scan a QR code shown at thumbnail size on a desktop monitor
