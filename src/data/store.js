@@ -41,6 +41,16 @@ const listeners = new Set();
 export const subscribe = (fn) => listeners.add(fn);
 const changed = () => { cachedGraph = null; listeners.forEach((fn) => fn()); };
 
+// A request that never resolves or rejects (a stuck connection, Supabase briefly unreachable)
+// is invisible to a plain try/catch — nothing throws, so loadEverything() would hang forever
+// with state.ready stuck false and no error to show. Race it against a timer instead, so a
+// stuck load always surfaces as a real, visible error.
+function withTimeout(promise, ms, message) {
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 // An UPDATE/DELETE blocked by RLS matches zero rows rather than erroring — PostgREST returns
 // success with an empty result, so without checking that, a write silently does nothing (this
 // is what made an admin's own edits vanish without any error whenever their session had quietly
@@ -126,11 +136,13 @@ async function afterPasswordVerified() {
       const factorId = factors?.totp?.[0]?.id;
       if (factorId) { state.mfaStep = { factorId }; changed(); return; }
     }
-    await loadEverything();
-  } catch {
+    await withTimeout(loadEverything(), 20000, 'TIMEOUT');
+  } catch (err) {
     await supabase.auth.signOut();
     Object.assign(state, { signedIn: false, ready: false, mfaStep: null });
-    state.authError = 'Your session expired. Please sign in again.';
+    state.authError = err?.message === 'TIMEOUT'
+      ? 'Loading your family took too long. Check your connection and try again.'
+      : 'Your session expired. Please sign in again.';
     changed();
   }
 }
