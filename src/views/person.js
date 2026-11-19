@@ -99,6 +99,8 @@ function editForm(p, mode) {
       if (v !== (p[key] ?? null)) changes[key] = v;
     }
     if (changes.full_name !== undefined) changes.name_known = !!changes.full_name;
+    const genderRaw = data.get('gender');
+    if (genderRaw !== null && genderRaw !== p.gender) changes.gender = genderRaw;
     const statusRaw = data.get('is_living');
     if (statusRaw !== null) {
       const v = statusRaw === '' ? null : statusRaw === 'true';
@@ -137,6 +139,11 @@ function editForm(p, mode) {
     h('h2', {}, t(mode === 'edit' ? 'person.edit' : 'person.suggest')),
     mode === 'suggest' ? h('p', { class: 'small muted' }, t('person.suggestNote')) : null,
     field('full_name'), field('known_as'), field('house_name'),
+    h('label', { for: 'f-gender' }, t('field.gender')),
+    h('select', { id: 'f-gender', name: 'gender' },
+      h('option', { value: 'unknown', selected: p.gender === 'unknown' }, t('gender.unknown')),
+      h('option', { value: 'male', selected: p.gender === 'male' }, t('gender.male')),
+      h('option', { value: 'female', selected: p.gender === 'female' }, t('gender.female'))),
     field('birth_year', 'number'), field('death_year', 'number'),
     h('label', { for: 'f-is_living' }, t('person.status')),
     h('select', { id: 'f-is_living', name: 'is_living' },
