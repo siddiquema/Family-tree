@@ -20,6 +20,7 @@ export function adminView() {
       h('h1', {}, t('admin.title')),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: () => { signOut(); location.hash = '#/'; } }, t('admin.signOut'))),
 
+    statsSection(),
     securitySection(),
     invitesSection(),
     stuckLoginsSection(),
@@ -85,6 +86,28 @@ function resetResultCard(r) {
         try { await navigator.clipboard.writeText(r.password); toast(t('admin.invitesCopied')); } catch { toast(r.password); }
       } }, t('admin.invitesCopy')),
       h('button', { class: 'btn btn-ghost btn-sm', type: 'button', onclick: dismissPasswordReset }, t('common.cancel'))));
+}
+
+/** A quick dashboard: how many people are in the tree, split by gender and living status,
+ *  and how many of them have actually joined the app. Counts straight from state.persons/
+ *  state.members — every member can already read all of persons (persons_read), so this needs
+ *  no new query. */
+function statsSection() {
+  const total = state.persons.length;
+  const joined = state.members.length;
+  const byGender = { male: 0, female: 0, unknown: 0 };
+  const byStatus = { living: 0, deceased: 0, unknown: 0 };
+  for (const p of state.persons) {
+    byGender[p.gender === 'male' || p.gender === 'female' ? p.gender : 'unknown']++;
+    byStatus[p.is_living === true ? 'living' : p.is_living === false ? 'deceased' : 'unknown']++;
+  }
+  const tile = (n, label) => h('div', { class: 'stat-tile' }, h('div', { class: 'stat-n' }, String(n)), h('div', { class: 'stat-label' }, label));
+  return h('section', {},
+    h('h2', { class: 'section-title' }, t('admin.statsTitle')),
+    h('div', { class: 'card stats-grid' },
+      tile(total, t('admin.statsTotal')), tile(joined, t('admin.statsJoined')),
+      tile(byGender.male, t('gender.male')), tile(byGender.female, t('gender.female')), tile(byGender.unknown, t('gender.unknown')),
+      tile(byStatus.living, t('person.living')), tile(byStatus.deceased, t('person.deceased')), tile(byStatus.unknown, t('person.livingUnknown'))));
 }
 
 /** Family-data export (CSV, for Excel) and import. Admin only (adminView already gates the page). */

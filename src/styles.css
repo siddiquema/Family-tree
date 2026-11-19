@@ -126,6 +126,11 @@ a { color: inherit; }
 .form .row { margin-top: 12px; }
 .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--fg); margin-top: 10px; }
 .checkbox-row input { width: auto; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 14px; text-align: center; }
+.stat-tile { display: grid; gap: 2px; }
+.stat-n { font-family: var(--f-display); font-size: 1.6rem; font-weight: 600; color: var(--accent); }
+.stat-label { font-size: .78rem; color: var(--muted); }
 .stack { display: grid; gap: 6px; }
 input, select, textarea {
   font: inherit; width: 100%; min-height: 44px; padding: 8px 12px; border-radius: 10px;
